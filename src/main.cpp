@@ -269,11 +269,11 @@ int main(int argc, char* argv[])
     LoadShadersFromFiles();
 
     // Carregamos duas imagens para serem utilizadas como textura
-    LoadTextureImage("../../data/tc-earth_daymap_surface.jpg");      // TextureImage0
-    LoadTextureImage("../../data/tc-earth_nightmap_citylights.gif"); // TextureImage1
+    LoadTextureImage("../../data/gold-texture.jpg");      // TextureOuro
+    LoadTextureImage("../../data/grass-texture.jpg"); // TextureGrama
 
     // Construímos a representação de objetos geométricos através de malhas de triângulos
-    ObjModel trophymodel("../../data/trophy3.obj");
+    ObjModel trophymodel("../../data/trophy.obj");
     ComputeNormals(&trophymodel);
     BuildTrianglesAndAddToVirtualScene(&trophymodel);
 
@@ -405,7 +405,7 @@ int main(int argc, char* argv[])
         DrawVirtualObject("trophyhandle");
 
         // DESENHANDO O CHÃO
-        model = Matrix_Scale(100,1.0f,100);;
+        model = Matrix_Identity();
         glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(object_id_uniform, FLOOR);
         DrawVirtualObject("floor");
@@ -580,9 +580,9 @@ void LoadShadersFromFiles()
 
     // Variáveis em "shader_fragment.glsl" para acesso das imagens de textura
     glUseProgram(program_id);
-    glUniform1i(glGetUniformLocation(program_id, "TextureImage0"), 0);
-    glUniform1i(glGetUniformLocation(program_id, "TextureImage1"), 1);
-    glUniform1i(glGetUniformLocation(program_id, "TextureImage2"), 2);
+    glUniform1i(glGetUniformLocation(program_id, "TextureOuro"), 0);
+    glUniform1i(glGetUniformLocation(program_id, "TextureGrama"), 1);
+
     glUseProgram(0);
 }
 

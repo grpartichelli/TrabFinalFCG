@@ -28,9 +28,8 @@ uniform vec4 bbox_min;
 uniform vec4 bbox_max;
 
 // Variáveis para acesso das imagens de textura
-uniform sampler2D TextureImage0;
-uniform sampler2D TextureImage1;
-uniform sampler2D TextureImage2;
+uniform sampler2D TextureOuro;
+uniform sampler2D TextureGrama;
 
 // O valor de saída ("out") de um Fragment Shader é a cor final do fragmento.
 out vec3 color;
@@ -67,6 +66,8 @@ void main()
     float U = 0.0;
     float V = 0.0;
 
+    // Definição de texturas
+    vec3 Kd0;
     if ( object_id == TROPHY)
     {
         // PROJEÇÃO PLANAR PARA O TROFÉU
@@ -81,24 +82,27 @@ void main()
 
         U = (position_model[0] - minx)/(maxx-minx);
         V = (position_model[1] - miny)/(maxy-miny);
+        //Utilizando a texture de Ouro para o troféu
+        Kd0 = texture(TextureOuro, vec2(U,V)).rgb;
     }
     else if ( object_id == FLOOR )
     {
-        //PROJEÇÃO UM-PARA-UM PARA O CHÃO
-        U = texcoords.x;
-        V = texcoords.y;
+        //PROJEÇÃO DO CHÃO UTILIZANDO UM ESTILO REPEAT
+        U = position_model[0];
+        U = U -floor(U);
+        V = position_model[2];
+        V = V - floor(V);
+        //Utilizando a textura de grama para o chão
+        Kd0 = texture(TextureGrama, vec2(U,V)).rgb;
     }
 
-    // Obtemos a refletância difusa a partir da leitura da imagem TextureImage0
-    vec3 Kd0 = texture(TextureImage0, vec2(U,V)).rgb;
 
     // Equação de Iluminação
     float lambert = max(0,dot(n,l));
 
 
-    vec3 Kd1 = texture(TextureImage1, vec2(U,V)).rgb;
 
-    color = Kd0   * (lambert + Kd1);
+    color = Kd0   * (lambert + 0.01);
 
     // Cor final com correção gamma, considerando monitor sRGB.
     // Veja https://en.wikipedia.org/w/index.php?title=Gamma_correction&oldid=751281772#Windows.2C_Mac.2C_sRGB_and_TV.2Fvideo_standard_gammas
