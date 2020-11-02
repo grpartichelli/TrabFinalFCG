@@ -388,17 +388,24 @@ int main(int argc, char* argv[])
 
         #define TROPHY 0
         #define FLOOR  1
-        
 
-      
+
+
         // DESENHANDO O TROFÉU
-        model =  Matrix_Translate(1.0f,0.0f,0.0f) * Matrix_Scale(0.001f,0.001f,0.001f);
+        //O .obj do troféu possui ele divido em várias partes
+        model =  Matrix_Scale(0.001f,0.001f,0.001f);
         glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(object_id_uniform, TROPHY);
         DrawVirtualObject("trophy");
+        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+        glUniform1i(object_id_uniform, TROPHY);
+        DrawVirtualObject("trophybase");
+        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+        glUniform1i(object_id_uniform, TROPHY);
+        DrawVirtualObject("trophyhandle");
 
         // DESENHANDO O CHÃO
-        model = Matrix_Translate(0.0f,-1.1f,0.0f);
+        model = Matrix_Scale(100,1.0f,100);;
         glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(object_id_uniform, FLOOR);
         DrawVirtualObject("floor");

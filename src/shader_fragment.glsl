@@ -67,17 +67,9 @@ void main()
     float U = 0.0;
     float V = 0.0;
 
-    if ( object_id == TROPHY )
+    if ( object_id == TROPHY)
     {
-        // PREENCHA AQUI as coordenadas de textura do coelho, computadas com
-        // projeção planar XY em COORDENADAS DO MODELO. Utilize como referência
-        // o slides 99-104 do documento Aula_20_Mapeamento_de_Texturas.pdf,
-        // e também use as variáveis min*/max* definidas abaixo para normalizar
-        // as coordenadas de textura U e V dentro do intervalo [0,1]. Para
-        // tanto, veja por exemplo o mapeamento da variável 'p_v' utilizando
-        // 'h' no slides 158-160 do documento Aula_20_Mapeamento_de_Texturas.pdf.
-        // Veja também a Questão 4 do Questionário 4 no Moodle.
-
+        // PROJEÇÃO PLANAR PARA O TROFÉU
         float minx = bbox_min.x;
         float maxx = bbox_max.x;
 
@@ -92,7 +84,7 @@ void main()
     }
     else if ( object_id == FLOOR )
     {
-        // Coordenadas de textura do plano, obtidas do arquivo OBJ.
+        //PROJEÇÃO UM-PARA-UM PARA O CHÃO
         U = texcoords.x;
         V = texcoords.y;
     }
