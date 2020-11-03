@@ -92,6 +92,7 @@ void main()
             break;
             
         case FLOOR:
+        
             //PROJEÇÃO DO CHÃO UTILIZANDO UM ESTILO REPEAT
             U = position_model[0];
             U = U -floor(U);
@@ -102,6 +103,8 @@ void main()
             break;
         case TORRE:
             // PROJEÇÃO PLANAR PARA A TORRE
+            
+
             U = (position_model[0] - minx)/(maxx-minx);
             V = (position_model[1] - miny)/(maxy-miny);
             //Utilizando a textura de tijolo para a torre

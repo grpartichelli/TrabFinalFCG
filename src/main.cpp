@@ -180,10 +180,10 @@ GLuint g_NumLoadedTextures = 0;
 
 
 //DEFINIÇÕES DA CAMÊRA
-glm::vec4 current_position = glm::vec4(0.0f,1.0f,15.0f,1.0f); //DEFININDO POSIÇÃO INICIAL
+glm::vec4 current_position = glm::vec4(0.0f,2.0f,10.0f,1.0f); //DEFININDO POSIÇÃO INICIAL
 
 float g_CameraTheta = 0.0f; // Ângulo no plano ZX em relação ao eixo Z
-float g_CameraPhi = 0.5f;   // Ângulo em relação ao eixo Y
+float g_CameraPhi = 0.0f;   // Ângulo em relação ao eixo Y
 float g_CameraDistance = 3.0f; // Distância da câmera para camera_lookat_l (raio da esfera)
 
 #define CHARACTER_CAMERA 1
@@ -193,7 +193,7 @@ int camera_type = 2;
 glm::vec4 camera_position_c, camera_lookat_l, camera_view_vector,w,u; //Vetores utilizados nos cálculos da câmera
 glm::vec4 camera_up_vector   = glm::vec4(0.0f,1.0f,0.0f,0.0f); // Vetor "up" fixado para apontar para o "céu" (eito Y global)
 float r,x,y,z;
-float camera_speed =2.5;
+float camera_speed =4;
 
 //Obtendo a resolução da tela
 int window_h;
@@ -443,7 +443,9 @@ int main(int argc, char* argv[])
         #define TOWER 2
         // DESENHANDO O TROFÉU
         //O .obj do troféu possui ele divido em várias partes
-        model =  Matrix_Scale(0.001f,0.001f,0.001f); //Diminuindo bastante o tamanho do troféu, seu .obj é grande
+        //Diminuindo bastante o tamanho do troféu, seu .obj é grande
+        //Translating ele para o topo da torre
+        model =  Matrix_Translate(0,9,0)*Matrix_Scale(0.001f,0.001f,0.001f);
         glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(object_id_uniform, TROPHY);
         DrawVirtualObject("trophy");
@@ -461,7 +463,7 @@ int main(int argc, char* argv[])
         DrawVirtualObject("floor");
 
         // DESENHANDO A TORRE
-        model =  Matrix_Scale(0.6f,0.6f,0.6f); //Diminuindo o tamanho da torre
+        model =  Matrix_Scale(0.4f,0.4f,0.4f); //Diminuindo o tamanho da torre
         glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(object_id_uniform, TOWER);
         DrawVirtualObject("tower");
