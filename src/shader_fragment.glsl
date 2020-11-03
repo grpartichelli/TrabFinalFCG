@@ -21,6 +21,7 @@ uniform mat4 projection;
 // Identificador que define qual objeto está sendo desenhado no momento
 #define TROPHY 0
 #define FLOOR 1
+#define TORRE 2
 uniform int object_id;
 
 // Parâmetros da axis-aligned bounding box (AABB) do modelo
@@ -30,6 +31,7 @@ uniform vec4 bbox_max;
 // Variáveis para acesso das imagens de textura
 uniform sampler2D TextureOuro;
 uniform sampler2D TextureGrama;
+uniform sampler2D TextureTijolo;
 
 // O valor de saída ("out") de um Fragment Shader é a cor final do fragmento.
 out vec3 color;
@@ -66,34 +68,45 @@ void main()
     float U = 0.0;
     float V = 0.0;
 
+    //BBOX
+    float minx = bbox_min.x;
+    float maxx = bbox_max.x;
+
+    float miny = bbox_min.y;
+    float maxy = bbox_max.y;
+
+    float minz = bbox_min.z;
+    float maxz = bbox_max.z;
+
     // Definição de texturas
     vec3 Kd0;
-    if ( object_id == TROPHY)
+    switch(object_id)
     {
-        // PROJEÇÃO PLANAR PARA O TROFÉU
-        float minx = bbox_min.x;
-        float maxx = bbox_max.x;
 
-        float miny = bbox_min.y;
-        float maxy = bbox_max.y;
-
-        float minz = bbox_min.z;
-        float maxz = bbox_max.z;
-
-        U = (position_model[0] - minx)/(maxx-minx);
-        V = (position_model[1] - miny)/(maxy-miny);
-        //Utilizando a texture de Ouro para o troféu
-        Kd0 = texture(TextureOuro, vec2(U,V)).rgb;
-    }
-    else if ( object_id == FLOOR )
-    {
-        //PROJEÇÃO DO CHÃO UTILIZANDO UM ESTILO REPEAT
-        U = position_model[0];
-        U = U -floor(U);
-        V = position_model[2];
-        V = V - floor(V);
-        //Utilizando a textura de grama para o chão
-        Kd0 = texture(TextureGrama, vec2(U,V)).rgb;
+        case TROPHY:
+            // PROJEÇÃO PLANAR PARA O TROFÉU
+            U = (position_model[0] - minx)/(maxx-minx);
+            V = (position_model[1] - miny)/(maxy-miny);
+            //Utilizando a texture de Ouro para o troféu
+            Kd0 = texture(TextureOuro, vec2(U,V)).rgb;
+            break;
+            
+        case FLOOR:
+            //PROJEÇÃO DO CHÃO UTILIZANDO UM ESTILO REPEAT
+            U = position_model[0];
+            U = U -floor(U);
+            V = position_model[2];
+            V = V - floor(V);
+            //Utilizando a textura de grama para o chão
+            Kd0 = texture(TextureGrama, vec2(U,V)).rgb;
+            break;
+        case TORRE:
+            // PROJEÇÃO PLANAR PARA A TORRE
+            U = (position_model[0] - minx)/(maxx-minx);
+            V = (position_model[1] - miny)/(maxy-miny);
+            //Utilizando a textura de tijolo para a torre
+            Kd0 = texture(TextureTijolo, vec2(U,V)).rgb;
+            break;
     }
 
 

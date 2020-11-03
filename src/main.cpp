@@ -180,6 +180,8 @@ GLuint g_NumLoadedTextures = 0;
 
 
 //DEFINIÇÕES DA CAMÊRA
+glm::vec4 current_position = glm::vec4(0.0f,1.0f,15.0f,1.0f); //DEFININDO POSIÇÃO INICIAL
+
 float g_CameraTheta = 0.0f; // Ângulo no plano ZX em relação ao eixo Z
 float g_CameraPhi = 0.5f;   // Ângulo em relação ao eixo Y
 float g_CameraDistance = 3.0f; // Distância da câmera para camera_lookat_l (raio da esfera)
@@ -196,7 +198,7 @@ float camera_speed =2.5;
 //Obtendo a resolução da tela
 int window_h;
 int window_w;
-int screentype = 0; //0 é fullscreen, 1 é em janela, 2 é em janela com mouse livre
+int screentype = 0; // 0 é em janela, 1 é em janela com mouse livre, 2 é fullscreen
 
 
 
@@ -231,7 +233,8 @@ int main(int argc, char* argv[])
     window_h = mode->height;
 
     GLFWwindow* window;
-    window = glfwCreateWindow(window_w, window_h, "Plataform Game", glfwGetPrimaryMonitor(), NULL);
+    window = glfwCreateWindow(window_w*0.8, window_h*0.8, "Climb The Tower", NULL, NULL);
+    glfwSetWindowPos(window, 50, 50);
 
     if (!window)
     {
@@ -272,6 +275,7 @@ int main(int argc, char* argv[])
     // CARREGANDO TEXTURAS QUE SERÃO UTILIZADAS
     LoadTextureImage("../../data/gold-texture.jpg");      // TextureOuro
     LoadTextureImage("../../data/grass-texture.jpg"); // TextureGrama
+    LoadTextureImage("../../data/brick-texture.jpg"); // TextureTijolo
 
     // CARREGANDO .OBJS QUE SERÃO UTILIZADOS
     ObjModel trophymodel("../../data/trophy.obj");
@@ -284,6 +288,9 @@ int main(int argc, char* argv[])
     BuildTrianglesAndAddToVirtualScene(&floormodel);
 
 
+    ObjModel towermodel("../../data/tower.obj");
+    ComputeNormals(&towermodel);
+    BuildTrianglesAndAddToVirtualScene(&towermodel);
 
 
     if ( argc > 1 )
@@ -340,11 +347,11 @@ int main(int argc, char* argv[])
                 break;
 
             case LOOK_AT_CAMERA:
-                camera_lookat_l    = glm::vec4(0.0f,0.0f,0.0f,1.0f); // Ponto "l", para onde a câmera (look-at) estará sempre olhando
+                camera_lookat_l    = current_position; // Ponto "l", para onde a câmera (look-at) estará sempre olhando
                 r = g_CameraDistance;
-                x = r*cos(g_CameraPhi)*sin(g_CameraTheta) + camera_lookat_l[0]; //Somando camera_lookat_l para que o circulo seja centrado na esfera
-                y = r*sin(g_CameraPhi) + camera_lookat_l[1];
-                z = r*cos(g_CameraPhi)*cos(g_CameraTheta) + camera_lookat_l[2];
+                x = r*cos(g_CameraPhi)*sin(g_CameraTheta) + current_position[0]; //Somando camera_lookat_l para que o circulo seja centrado na esfera
+                y = r*sin(g_CameraPhi) + current_position[1];
+                z = r*cos(g_CameraPhi)*cos(g_CameraTheta) + current_position[2];
                 camera_position_c  = glm::vec4(x,y,z,1.0f); // Ponto "c", centro da câmera
                 camera_view_vector = camera_lookat_l - camera_position_c; // Vetor "view", sentido para onde a câmera está virada
                 break;
@@ -433,9 +440,10 @@ int main(int argc, char* argv[])
         // DESENHANDO OBJETOS NA CENA
         #define TROPHY 0
         #define FLOOR  1
+        #define TOWER 2
         // DESENHANDO O TROFÉU
         //O .obj do troféu possui ele divido em várias partes
-        model =  Matrix_Scale(0.001f,0.001f,0.001f);
+        model =  Matrix_Scale(0.001f,0.001f,0.001f); //Diminuindo bastante o tamanho do troféu, seu .obj é grande
         glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(object_id_uniform, TROPHY);
         DrawVirtualObject("trophy");
@@ -451,6 +459,12 @@ int main(int argc, char* argv[])
         glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(object_id_uniform, FLOOR);
         DrawVirtualObject("floor");
+
+        // DESENHANDO A TORRE
+        model =  Matrix_Scale(0.6f,0.6f,0.6f); //Diminuindo o tamanho da torre
+        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+        glUniform1i(object_id_uniform, TOWER);
+        DrawVirtualObject("tower");
 
 
         ///////////////////////////////////////////
@@ -588,6 +602,7 @@ void LoadShadersFromFiles()
     glUseProgram(program_id);
     glUniform1i(glGetUniformLocation(program_id, "TextureOuro"), 0);
     glUniform1i(glGetUniformLocation(program_id, "TextureGrama"), 1);
+    glUniform1i(glGetUniformLocation(program_id, "TextureTijolo"), 2);
 
     glUseProgram(0);
 }
@@ -1140,16 +1155,17 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
         screentype++;
         screentype = screentype%3;
         switch(screentype){
-            case 0: //FULLSCREEN
-                 glfwSetWindowMonitor(window,  glfwGetPrimaryMonitor() , 0, 0, window_w/0.8, window_h/0.8, GLFW_DONT_CARE);
-                 glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED); //ESCONDE CURSOR
-                 break;
-            case 1: //JANELA
+            case 0: //JANELA
+
                 glfwSetWindowMonitor(window,   NULL, 0, 0,  window_w*0.8, window_h*0.8, GLFW_DONT_CARE);
                 glfwSetWindowPos(window, 50, 50);
                 break;
-            case 2: //MOUSE LIVRE
+            case 1: //MOUSE LIVRE
                  glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL); //MOSTRA O CURSOR
+                 break;
+            case 2: //FULLSCREEN
+                 glfwSetWindowMonitor(window,  glfwGetPrimaryMonitor() , 0, 0, window_w/0.8, window_h/0.8, GLFW_DONT_CARE);
+                 glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED); //ESCONDE CURSOR
                  break;
         }
     }
