@@ -233,7 +233,7 @@ int main(int argc, char* argv[])
     window_h = mode->height;
 
     GLFWwindow* window;
-    window = glfwCreateWindow(window_w*0.8, window_h*0.8, "Climb The Tower", NULL, NULL);
+    window = glfwCreateWindow(window_w*0.8, window_h*0.8, "Mr Robot Reaches the Top", NULL, NULL);
     glfwSetWindowPos(window, 50, 50);
 
     if (!window)
@@ -276,6 +276,8 @@ int main(int argc, char* argv[])
     LoadTextureImage("../../data/gold-texture.jpg");      // TextureOuro
     LoadTextureImage("../../data/grass-texture.jpg"); // TextureGrama
     LoadTextureImage("../../data/brick-texture.jpg"); // TextureTijolo
+    LoadTextureImage("../../data/light-metal-texture.jpg"); // TextureTijolo
+    LoadTextureImage("../../data/dark-metal-texture.jpg"); // TextureTijolo
 
     // CARREGANDO .OBJS QUE SERÃO UTILIZADOS
     ObjModel trophymodel("../../data/trophy.obj");
@@ -291,6 +293,11 @@ int main(int argc, char* argv[])
     ObjModel towermodel("../../data/tower.obj");
     ComputeNormals(&towermodel);
     BuildTrianglesAndAddToVirtualScene(&towermodel);
+
+    ObjModel robotmodel("../../data/robot.obj");
+    ComputeNormals(&robotmodel);
+    BuildTrianglesAndAddToVirtualScene(&robotmodel);
+
 
 
     if ( argc > 1 )
@@ -441,11 +448,13 @@ int main(int argc, char* argv[])
         #define TROPHY 0
         #define FLOOR  1
         #define TOWER 2
+        #define ROBOTTOP 3
+        #define ROBOTBOTTOM 4
         // DESENHANDO O TROFÉU
         //O .obj do troféu possui ele divido em várias partes
         //Diminuindo bastante o tamanho do troféu, seu .obj é grande
         //Translating ele para o topo da torre
-        model =  Matrix_Translate(0,9,0)*Matrix_Scale(0.001f,0.001f,0.001f);
+        model =  Matrix_Translate(0,9,0)*Matrix_Scale(0.002f,0.002f,0.002f);
         glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(object_id_uniform, TROPHY);
         DrawVirtualObject("trophy");
@@ -463,10 +472,22 @@ int main(int argc, char* argv[])
         DrawVirtualObject("floor");
 
         // DESENHANDO A TORRE
-        model =  Matrix_Scale(0.4f,0.4f,0.4f); //Diminuindo o tamanho da torre
+        model =  Matrix_Scale(0.4,0.4,0.4); //Diminuindo o tamanho da torre
         glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(object_id_uniform, TOWER);
         DrawVirtualObject("tower");
+
+        // DESENHANDO O ROBO
+        //Robo é divido em duas parte, top (cabeça) e bottom (esfera inferior)
+        model =  Matrix_Translate(current_position[0],current_position[1]-1,current_position[2])*Matrix_Scale(0.01,0.01,0.01); //Diminuindo o tamanho da torre
+        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+        glUniform1i(object_id_uniform, ROBOTTOP);
+        DrawVirtualObject("robotTop");
+
+        model =  Matrix_Translate(current_position[0],current_position[1]-1,current_position[2])*Matrix_Scale(0.01,0.01,0.01); //Diminuindo o tamanho da torre
+        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+        glUniform1i(object_id_uniform, ROBOTBOTTOM);
+        DrawVirtualObject("robotBottom");
 
 
         ///////////////////////////////////////////
@@ -605,6 +626,8 @@ void LoadShadersFromFiles()
     glUniform1i(glGetUniformLocation(program_id, "TextureOuro"), 0);
     glUniform1i(glGetUniformLocation(program_id, "TextureGrama"), 1);
     glUniform1i(glGetUniformLocation(program_id, "TextureTijolo"), 2);
+    glUniform1i(glGetUniformLocation(program_id, "TextureMetalClaro"), 3);
+    glUniform1i(glGetUniformLocation(program_id, "TextureMetalEscuro"),4);
 
     glUseProgram(0);
 }
