@@ -1143,7 +1143,10 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
     }
     if (key == GLFW_KEY_3 && action == GLFW_PRESS)
     {
+        camera_lookat_l = camera_position_c + glm::vec4(0,0,-1,0);
+        camera_view_vector = camera_lookat_l - camera_position_c;
         camera_type = FREE_CAMERA;
+
     }
 
 
