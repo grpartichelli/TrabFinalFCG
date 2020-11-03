@@ -196,7 +196,7 @@ float camera_speed =2.5;
 //Obtendo a resolução da tela
 int window_h;
 int window_w;
-bool fullscreen = true;
+int screentype = 0; //0 é fullscreen, 1 é em janela, 2 é em janela com mouse livre
 
 
 
@@ -232,7 +232,7 @@ int main(int argc, char* argv[])
 
     GLFWwindow* window;
     window = glfwCreateWindow(window_w, window_h, "Plataform Game", glfwGetPrimaryMonitor(), NULL);
-    //glfwSetWindowPos(window, 50, 50); //Posiciona a janela no canto esquerdo superior
+
     if (!window)
     {
         glfwTerminate();
@@ -240,7 +240,7 @@ int main(int argc, char* argv[])
         std::exit(EXIT_FAILURE);
     }
 
-
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED); //ESCONDE CURSOR
 
     // Definimos a função de callback que será chamada sempre que o usuário
     // pressionar alguma tecla do teclado ...
@@ -998,8 +998,8 @@ double g_LastCursorPosX, g_LastCursorPosY;
 void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
 {
 
-
-
+    return;
+    /*
       if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
     {
         g_LeftMouseButtonPressed = true;
@@ -1011,6 +1011,7 @@ void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
         g_LeftMouseButtonPressed = false;
 
     }
+    */
 
 }
 
@@ -1021,16 +1022,16 @@ void CursorPosCallback(GLFWwindow* window, double xpos, double ypos)
 
 
     //Nao queremos movimentar se o usuario estiver usando o cursor
-    if(!g_LeftMouseButtonPressed )
-        return;
+    //if(!g_LeftMouseButtonPressed )
+     //   return;
 
     // Deslocamento do cursor do mouse em x e y de coordenadas de tela!
     float dx = xpos - g_LastCursorPosX;
     float dy = ypos - g_LastCursorPosY;
 
     // Atualizamos parâmetros da câmera com os deslocamentos
-    g_CameraTheta -= 0.005f*dx;
-    g_CameraPhi   += 0.005f*dy;
+    g_CameraTheta -= 0.0025f*dx;
+    g_CameraPhi   += 0.0025f*dy;
 
     // Em coordenadas esféricas, o ângulo phi deve ficar entre -pi/2 e +pi/2.
     float phimax = 3.141592f/2;
@@ -1046,6 +1047,7 @@ void CursorPosCallback(GLFWwindow* window, double xpos, double ypos)
     // cursor como sendo a última posição conhecida do cursor.
     g_LastCursorPosX = xpos;
     g_LastCursorPosY = ypos;
+
 
 
 }
@@ -1134,14 +1136,22 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
     }
 
     if (key == GLFW_KEY_F && action == GLFW_PRESS){
-        //Obtendo fullscreen ou nao apertando F
-        fullscreen = !fullscreen;
-        if(fullscreen)
-            glfwSetWindowMonitor(window,  glfwGetPrimaryMonitor() , 0, 0, window_w/0.8, window_h/0.8, GLFW_DONT_CARE);
-        else{
-            glfwSetWindowMonitor(window,   NULL, 0, 0,  window_w*0.8, window_h*0.8, GLFW_DONT_CARE);
+        //Trocando entre fullscreen, janela e mouse livre
+        screentype++;
+        screentype = screentype%3;
+        switch(screentype){
+            case 0: //FULLSCREEN
+                 glfwSetWindowMonitor(window,  glfwGetPrimaryMonitor() , 0, 0, window_w/0.8, window_h/0.8, GLFW_DONT_CARE);
+                 glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED); //ESCONDE CURSOR
+                 break;
+            case 1: //JANELA
+                glfwSetWindowMonitor(window,   NULL, 0, 0,  window_w*0.8, window_h*0.8, GLFW_DONT_CARE);
+                glfwSetWindowPos(window, 50, 50);
+                break;
+            case 2: //MOUSE LIVRE
+                 glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL); //MOSTRA O CURSOR
+                 break;
         }
-        glfwSetWindowPos(window, 50, 50);
     }
     //Alterando o tipo de camêra de acordo com a tecla pressionada
     //Tecla 1: Camêra em primeira pessoa do personagem
