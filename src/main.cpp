@@ -298,6 +298,13 @@ int main(int argc, char* argv[])
     ComputeNormals(&robotmodel);
     BuildTrianglesAndAddToVirtualScene(&robotmodel);
 
+    ObjModel cubemodel("../../data/cube.obj");
+    ComputeNormals(&cubemodel);
+    BuildTrianglesAndAddToVirtualScene(&cubemodel);
+
+    ObjModel spheremodel("../../data/sphere.obj");
+    ComputeNormals(&spheremodel);
+    BuildTrianglesAndAddToVirtualScene(&spheremodel);
 
 
     if ( argc > 1 )
@@ -450,6 +457,8 @@ int main(int argc, char* argv[])
         #define TOWER 2
         #define ROBOTTOP 3
         #define ROBOTBOTTOM 4
+        #define CUBE 5
+        #define SPHERE 6
         // DESENHANDO O TROFÉU
         //O .obj do troféu possui ele divido em várias partes
         //Diminuindo bastante o tamanho do troféu, seu .obj é grande
@@ -488,6 +497,12 @@ int main(int argc, char* argv[])
         glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(object_id_uniform, ROBOTBOTTOM);
         DrawVirtualObject("robotBottom");
+
+        //UTILIZANDO CUBOS PARA GERAR AS PLATAFORMAS
+        model =  Matrix_Translate(2,2,2)*Matrix_Scale(1,0.2,1);
+        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+        glUniform1i(object_id_uniform, CUBE);
+        DrawVirtualObject("cube");
 
 
         ///////////////////////////////////////////

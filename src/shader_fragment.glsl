@@ -24,6 +24,8 @@ uniform mat4 projection;
 #define TORRE 2
 #define ROBOTTOP 3
 #define ROBOTBOTTOM 4
+#define CUBE 5
+#define SPHERE 6
 uniform int object_id;
 
 // Parâmetros da axis-aligned bounding box (AABB) do modelo
@@ -69,10 +71,6 @@ void main()
     // Vetor que define o sentido da câmera em relação ao ponto atual.
     vec4 v = normalize(camera_position - p);
 
-    // Coordenadas de textura U e V
-    float U = 0.0;
-    float V = 0.0;
-
     //BBOX
     float minx = bbox_min.x;
     float maxx = bbox_max.x;
@@ -83,22 +81,27 @@ void main()
     float minz = bbox_min.z;
     float maxz = bbox_max.z;
 
-    // Definição de texturas
-    U = (position_model[0] - minx)/(maxx-minx); //Pré calculando uma projeção planar
-    V = (position_model[1] - miny)/(maxy-miny); //Pré calculando uma projeção planar
+    // Coordenadas de textura U e V
+    float U = (position_model[0] - minx)/(maxx-minx); //Pré calculando uma projeção planar
+    float V = (position_model[1] - miny)/(maxy-miny); //Pré calculando uma projeção planar
+
+    //Pré calculando a projeção esférica
+    vec4 bbox_center   = (bbox_min + bbox_max) / 2.0;
+    vec4 p_vec = bbox_center + ((position_model - bbox_center)/length(position_model - bbox_center));
+    float theta = atan(p_vec[0],p_vec[2]);
+    float phi = asin(p_vec[1]);
+
 
     vec3 Kd0;
     switch(object_id)
     {
-
+        // PROJEÇÃO PLANAR PARA O TROFÉU
         case TROPHY:
-            // PROJEÇÃO PLANAR PARA O TROFÉU
             //Utilizando a texture de Ouro para o troféu
             Kd0 = texture(TextureOuro, vec2(U,V)).rgb;
             break;
 
         case FLOOR:
-
             //PROJEÇÃO DO CHÃO UTILIZANDO UM ESTILO REPEAT
             U = position_model[0];
             U = U -floor(U);
@@ -107,10 +110,9 @@ void main()
             //Utilizando a textura de grama para o chão
             Kd0 = texture(TextureGrama, vec2(U,V)).rgb;
             break;
+        // PROJEÇÃO PLANAR PARA A TORRE
         case TORRE:
-            // PROJEÇÃO PLANAR PARA A TORRE
-            //Utilizando a textura de tijolo para a torre
-            Kd0 = texture(TextureTijolo, vec2(U,V)).rgb;
+            Kd0 = texture(TextureTijolo, vec2(U,V)).rgb; //Utilizando a textura de tijolo para a torre
             break;
 
         //PROJEÇÃO PLANAR PARA ROBO
@@ -120,17 +122,17 @@ void main()
         case ROBOTBOTTOM:
              Kd0 = texture(TextureMetalEscuro, vec2(U,V)).rgb;  //Utilizando a textura de metal escuro para a parte de baixo
              break;
-        //Deixamos o default como a projeção esférica, porém nao obtivemos bons resultados com ela...
-        default:
-            float radius = 1;
-            vec4 bbox_center   = (bbox_min + bbox_max) / 2.0;
-            vec4 p_vec = bbox_center + ((position_model - bbox_center)/length(position_model - bbox_center))*radius;
-            float theta = atan(p_vec[0],p_vec[2]);
-            float phi = asin(p_vec[1]/radius);
+        //PROJEÇÃO ESFÉRICA PARA O CUBO
+        case CUBE:
             U = (theta + M_PI)/(2*M_PI);
             V = (phi + M_PI/2)/M_PI;
-            Kd0 = texture(TextureMetalEscuro, vec2(U,V)).rgb;
-        
+            Kd0 = texture(TextureTijolo, vec2(U,V)).rgb;
+            break;
+        ////PROJEÇÃO ESFÉRICA PARA A ESFERA
+        case SPHERE:
+            U = (theta + M_PI)/(2*M_PI);
+            V = (phi + M_PI/2)/M_PI;
+            Kd0 = texture(TextureTijolo, vec2(U,V)).rgb;
             break;
         }
 
