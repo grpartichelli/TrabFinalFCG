@@ -200,6 +200,15 @@ int window_h;
 int window_w;
 int screentype = 0; // 0 é em janela, 1 é em janela com mouse livre, 2 é fullscreen
 
+//OBJETOS QUE SÃO DESENHADOS
+#define TROPHY 0
+#define FLOOR  1
+#define TOWER 2
+#define ROBOTTOP 3
+#define ROBOTBOTTOM 4
+#define SPHERE 5
+#define CUBE 6
+
 
 
 int main(int argc, char* argv[])
@@ -276,8 +285,9 @@ int main(int argc, char* argv[])
     LoadTextureImage("../../data/gold-texture.jpg");      // TextureOuro
     LoadTextureImage("../../data/grass-texture.jpg"); // TextureGrama
     LoadTextureImage("../../data/brick-texture.jpg"); // TextureTijolo
-    LoadTextureImage("../../data/light-metal-texture.jpg"); // TextureTijolo
-    LoadTextureImage("../../data/dark-metal-texture.jpg"); // TextureTijolo
+    LoadTextureImage("../../data/light-metal-texture.jpg"); // TextureMetalClara
+    LoadTextureImage("../../data/dark-metal-texture.jpg"); // TextureMetalEscura
+    LoadTextureImage("../../data/meteor-texture.jpg"); // TextureMeteoro
 
     // CARREGANDO .OBJS QUE SERÃO UTILIZADOS
     ObjModel trophymodel("../../data/trophy.obj");
@@ -298,13 +308,17 @@ int main(int argc, char* argv[])
     ComputeNormals(&robotmodel);
     BuildTrianglesAndAddToVirtualScene(&robotmodel);
 
-    ObjModel cubemodel("../../data/cube.obj");
-    ComputeNormals(&cubemodel);
-    BuildTrianglesAndAddToVirtualScene(&cubemodel);
 
     ObjModel spheremodel("../../data/sphere.obj");
     ComputeNormals(&spheremodel);
     BuildTrianglesAndAddToVirtualScene(&spheremodel);
+
+    ObjModel cubemodel("../../data/cube.obj");
+    ComputeNormals(&cubemodel);
+    BuildTrianglesAndAddToVirtualScene(&cubemodel);
+
+
+
 
 
     if ( argc > 1 )
@@ -451,14 +465,7 @@ int main(int argc, char* argv[])
         glUniformMatrix4fv(projection_uniform , 1 , GL_FALSE , glm::value_ptr(projection));
 
 
-        // DESENHANDO OBJETOS NA CENA
-        #define TROPHY 0
-        #define FLOOR  1
-        #define TOWER 2
-        #define ROBOTTOP 3
-        #define ROBOTBOTTOM 4
-        #define CUBE 5
-        #define SPHERE 6
+
         // DESENHANDO O TROFÉU
         //O .obj do troféu possui ele divido em várias partes
         //Diminuindo bastante o tamanho do troféu, seu .obj é grande
@@ -498,11 +505,20 @@ int main(int argc, char* argv[])
         glUniform1i(object_id_uniform, ROBOTBOTTOM);
         DrawVirtualObject("robotBottom");
 
+
+        //UTILIZANDO ESFERAS PARA OS "METEOROS"
+        model =  Matrix_Translate(0,5,10);
+        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+        glUniform1i(object_id_uniform, SPHERE);
+        DrawVirtualObject("sphere");
+
+
         //UTILIZANDO CUBOS PARA GERAR AS PLATAFORMAS
         model =  Matrix_Translate(2,2,2)*Matrix_Scale(1,0.2,1);
         glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(object_id_uniform, CUBE);
         DrawVirtualObject("cube");
+
 
 
         ///////////////////////////////////////////
@@ -638,11 +654,12 @@ void LoadShadersFromFiles()
 
     // Variáveis em "shader_fragment.glsl" para acesso das imagens de textura
     glUseProgram(program_id);
-    glUniform1i(glGetUniformLocation(program_id, "TextureOuro"), 0);
-    glUniform1i(glGetUniformLocation(program_id, "TextureGrama"), 1);
-    glUniform1i(glGetUniformLocation(program_id, "TextureTijolo"), 2);
-    glUniform1i(glGetUniformLocation(program_id, "TextureMetalClaro"), 3);
-    glUniform1i(glGetUniformLocation(program_id, "TextureMetalEscuro"),4);
+    glUniform1i(glGetUniformLocation(program_id, "TextureOuro"), TROPHY);
+    glUniform1i(glGetUniformLocation(program_id, "TextureGrama"), FLOOR);
+    glUniform1i(glGetUniformLocation(program_id, "TextureTijolo"), TOWER);
+    glUniform1i(glGetUniformLocation(program_id, "TextureMetalClaro"), ROBOTTOP);
+    glUniform1i(glGetUniformLocation(program_id, "TextureMetalEscuro"),ROBOTBOTTOM);
+    glUniform1i(glGetUniformLocation(program_id, "TextureMeteoro"),SPHERE);
 
     glUseProgram(0);
 }

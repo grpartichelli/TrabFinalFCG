@@ -38,6 +38,7 @@ uniform sampler2D TextureGrama;
 uniform sampler2D TextureTijolo;
 uniform sampler2D TextureMetalClaro;
 uniform sampler2D TextureMetalEscuro;
+uniform sampler2D TextureMeteoro;
 
 
 // O valor de saída ("out") de um Fragment Shader é a cor final do fragmento.
@@ -86,7 +87,7 @@ void main()
     float V = (position_model[1] - miny)/(maxy-miny); //Pré calculando uma projeção planar
 
     //Pré calculando a projeção esférica
-    vec4 bbox_center   = (bbox_min + bbox_max) / 2.0;
+    vec4 bbox_center   = (bbox_min + bbox_max) / 2;
     vec4 p_vec = bbox_center + ((position_model - bbox_center)/length(position_model - bbox_center));
     float theta = atan(p_vec[0],p_vec[2]);
     float phi = asin(p_vec[1]);
@@ -123,16 +124,14 @@ void main()
              Kd0 = texture(TextureMetalEscuro, vec2(U,V)).rgb;  //Utilizando a textura de metal escuro para a parte de baixo
              break;
         //PROJEÇÃO ESFÉRICA PARA O CUBO
-        case CUBE:
-            U = (theta + M_PI)/(2*M_PI);
-            V = (phi + M_PI/2)/M_PI;
-            Kd0 = texture(TextureTijolo, vec2(U,V)).rgb;
-            break;
-        ////PROJEÇÃO ESFÉRICA PARA A ESFERA
         case SPHERE:
             U = (theta + M_PI)/(2*M_PI);
-            V = (phi + M_PI/2)/M_PI;
+            V = (phi + M_PI_2)/M_PI;
             Kd0 = texture(TextureTijolo, vec2(U,V)).rgb;
+            break;
+        ////PROJEÇÃO PLANAR PARA A ESFERA
+        case CUBE:
+            Kd0 = texture(TextureMeteoro, vec2(U,V)).rgb;
             break;
         }
 
