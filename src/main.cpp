@@ -193,6 +193,12 @@ glm::vec4 camera_up_vector   = glm::vec4(0.0f,1.0f,0.0f,0.0f); // Vetor "up" fix
 float r,x,y,z;
 float camera_speed =2.5;
 
+//Obtendo a resolução da tela
+int window_h;
+int window_w;
+bool fullscreen = true;
+
+
 
 int main(int argc, char* argv[])
 {
@@ -220,13 +226,13 @@ int main(int argc, char* argv[])
     // funções modernas de OpenGL.
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    // Criamos uma janela do sistema operacional, com 800 colunas e 600 linhas
-    // de pixels, e com título "INF01047 ...".
-    int window_h = 1000;
-    int window_w = 600;
+    const GLFWvidmode * mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
+    window_w = mode->width;
+    window_h = mode->height;
+
     GLFWwindow* window;
-    window = glfwCreateWindow(window_h,window_w, "Plataform Game", NULL, NULL);
-    glfwSetWindowPos(window, 50, 50); //Posiciona a janela no canto esquerdo superior
+    window = glfwCreateWindow(window_w, window_h, "Plataform Game", glfwGetPrimaryMonitor(), NULL);
+    //glfwSetWindowPos(window, 50, 50); //Posiciona a janela no canto esquerdo superior
     if (!window)
     {
         glfwTerminate();
@@ -257,7 +263,7 @@ int main(int argc, char* argv[])
     // redimensionada, por consequência alterando o tamanho do "framebuffer"
     // (região de memória onde são armazenados os pixels da imagem).
     glfwSetFramebufferSizeCallback(window, FramebufferSizeCallback);
-    FramebufferSizeCallback(window,window_h,window_w); // Forçamos a chamada do callback acima, para definir g_ScreenRatio.
+    FramebufferSizeCallback(window,window_w,window_h); // Forçamos a chamada do callback acima, para definir g_ScreenRatio.
 
 
     // Carregamos os shaders de vértices e de fragmentos que serão utilizados para renderização.
@@ -992,7 +998,7 @@ double g_LastCursorPosX, g_LastCursorPosY;
 void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
 {
 
-   
+
 
       if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
     {
@@ -1127,6 +1133,16 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
         g_ShowInfoText = !g_ShowInfoText;
     }
 
+    if (key == GLFW_KEY_F && action == GLFW_PRESS){
+        //Obtendo fullscreen ou nao apertando F
+        fullscreen = !fullscreen;
+        if(fullscreen)
+            glfwSetWindowMonitor(window,  glfwGetPrimaryMonitor() , 0, 0, window_w/0.8, window_h/0.8, GLFW_DONT_CARE);
+        else{
+            glfwSetWindowMonitor(window,   NULL, 0, 0,  window_w*0.8, window_h*0.8, GLFW_DONT_CARE);
+        }
+        glfwSetWindowPos(window, 50, 50);
+    }
     //Alterando o tipo de camêra de acordo com a tecla pressionada
     //Tecla 1: Camêra em primeira pessoa do personagem
     //Tecla 2: Camêra look at em volta do personagem
@@ -1143,7 +1159,7 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
     }
     if (key == GLFW_KEY_3 && action == GLFW_PRESS)
     {
-        camera_lookat_l = camera_position_c + glm::vec4(0,0,-1,0);
+        camera_lookat_l = camera_position_c + glm::vec4(0,0,-1,0); //Isso garante que a rotação em torno do eixo X funcione.
         camera_view_vector = camera_lookat_l - camera_position_c;
         camera_type = FREE_CAMERA;
 
