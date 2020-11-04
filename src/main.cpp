@@ -138,6 +138,8 @@ void ScrollCallback(GLFWwindow* window, double xoffset, double yoffset);
 
 
 //Nossas funções
+
+void LoadLookAtCamera(); //Calculates camera position,lookatposition and view_vector for look at camera
 void LoadTexturesAndModels(); //Carrega os modelos .obj e texturas que serão utilizadas
 void DrawObjectModels();    //Desenha o modelo dos objetos na cena
 glm::mat4 ComputeProjectionMatrix(); //Cria matriz de projeção
@@ -203,14 +205,14 @@ GLuint g_NumLoadedTextures = 0;
 
 
 //DEFINIÇÕES DA CAMÊRA
-glm::vec4 character_position = glm::vec4(0.0f,0.0f,10.0f,1.0f); //DEFININDO POSIÇÃO INICIAL
+glm::vec4 character_position = glm::vec4(0.0f,0.0f,14.0f,1.0f); //DEFININDO POSIÇÃO INICIAL
 
 float g_CameraTheta = 0.0f; // Ângulo no plano ZX em relação ao eixo Z
 float g_CameraPhi = 0.5f;   // Ângulo em relação ao eixo Y
 float g_CameraDistance = 5.0f; // Distância da câmera para camera_lookat_l (raio da esfera)
 
 
-int camera_type = LOOK_AT_CAMERA;
+int camera_type = CHARACTER_CAMERA;
 glm::vec4 camera_position_c, camera_lookat_l, camera_view_vector,w,u; //Vetores utilizados nos cálculos da câmera
 glm::vec4 camera_up_vector   = glm::vec4(0.0f,1.0f,0.0f,0.0f); // Vetor "up" fixado para apontar para o "céu" (eito Y global)
 float r,x,y,z;
@@ -318,6 +320,8 @@ int main(int argc, char* argv[])
     //Váriaveis utilizadas para garantir que animações sejam idependetes de tempo de execução
     float t_prev = glfwGetTime();
     float t_dif,t_atual;
+
+    LoadLookAtCamera(); //Initialing vectors with look at camera
     // Ficamos em loop, renderizando, até que o usuário feche a janela
     while (!glfwWindowShouldClose(window))
     {
@@ -339,13 +343,7 @@ int main(int argc, char* argv[])
                 break;
 
             case LOOK_AT_CAMERA:
-                camera_lookat_l    = character_position; // Ponto "l", para onde a câmera (look-at) estará sempre olhando
-                r = g_CameraDistance;
-                x = r*cos(g_CameraPhi)*sin(g_CameraTheta) + character_position[0]; //Somando camera_lookat_l para que o circulo seja centrado na esfera
-                y = r*sin(g_CameraPhi) + character_position[1];
-                z = r*cos(g_CameraPhi)*cos(g_CameraTheta) + character_position[2];
-                camera_position_c  = glm::vec4(x,y,z,1.0f); // Ponto "c", centro da câmera
-                camera_view_vector = camera_lookat_l - camera_position_c; // Vetor "view", sentido para onde a câmera está virada
+                LoadLookAtCamera();
                 break;
             case FREE_CAMERA:
                 /////////////////////////////////////////////////////////////////////////////////
@@ -414,6 +412,20 @@ int main(int argc, char* argv[])
     // Fim do programa
     return 0;
 }
+//Calculates camera position,lookatposition and view_vector for look at camera
+void LoadLookAtCamera(){
+
+    camera_lookat_l    = character_position; // Ponto "l", para onde a câmera (look-at) estará sempre olhando
+    r = g_CameraDistance;
+    x = r*cos(g_CameraPhi)*sin(g_CameraTheta) + character_position[0]; //Somando camera_lookat_l para que o circulo seja centrado na esfera
+    y = r*sin(g_CameraPhi) + character_position[1];
+    z = r*cos(g_CameraPhi)*cos(g_CameraTheta) + character_position[2];
+    camera_position_c  = glm::vec4(x,y,z,1.0f); // Ponto "c", centro da câmera
+    camera_view_vector = camera_lookat_l - camera_position_c; // Vetor "view", sentido para onde a câmera está virada
+
+
+}
+
 //CARREGANDO AS TEXTURAS E .OBJ QUE SERÃO UTILIZADOS
 void LoadTexturesAndModels(){
 
