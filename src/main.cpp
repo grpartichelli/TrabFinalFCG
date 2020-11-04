@@ -48,6 +48,21 @@
 #include "utils.h"
 #include "matrices.h"
 
+//OBJETOS QUE SÃO DESENHADOS
+#define TROPHY 0
+#define FLOOR  1
+#define TOWER 2
+#define ROBOTTOP 3
+#define ROBOTBOTTOM 4
+#define SPHERE 5
+#define CUBE 6
+//TIPOS DE CAMERA
+#define CHARACTER_CAMERA 1
+#define LOOK_AT_CAMERA 2
+#define FREE_CAMERA 3
+
+
+
 // Estrutura que representa um modelo geométrico carregado a partir de um
 // arquivo ".obj". Veja https://en.wikipedia.org/wiki/Wavefront_.obj_file .
 struct ObjModel
@@ -121,6 +136,14 @@ void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
 void CursorPosCallback(GLFWwindow* window, double xpos, double ypos);
 void ScrollCallback(GLFWwindow* window, double xoffset, double yoffset);
 
+
+//Nossas funções
+void LoadTexturesAndModels(); //Carrega os modelos .obj e texturas que serão utilizadas
+void DrawObjectModels();    //Desenha o modelo dos objetos na cena
+glm::mat4 ComputeProjectionMatrix(); //Cria matriz de projeção
+
+
+
 // Definimos uma estrutura que armazenará dados necessários para renderizar
 // cada objeto da cena virtual.
 struct SceneObject
@@ -186,10 +209,8 @@ float g_CameraTheta = 0.0f; // Ângulo no plano ZX em relação ao eixo Z
 float g_CameraPhi = 0.0f;   // Ângulo em relação ao eixo Y
 float g_CameraDistance = 3.0f; // Distância da câmera para camera_lookat_l (raio da esfera)
 
-#define CHARACTER_CAMERA 1
-#define LOOK_AT_CAMERA 2
-#define FREE_CAMERA 3
-int camera_type = 2;
+
+int camera_type = LOOK_AT_CAMERA;
 glm::vec4 camera_position_c, camera_lookat_l, camera_view_vector,w,u; //Vetores utilizados nos cálculos da câmera
 glm::vec4 camera_up_vector   = glm::vec4(0.0f,1.0f,0.0f,0.0f); // Vetor "up" fixado para apontar para o "céu" (eito Y global)
 float r,x,y,z;
@@ -200,14 +221,6 @@ int window_h;
 int window_w;
 int screentype = 0; // 0 é em janela, 1 é em janela com mouse livre, 2 é fullscreen
 
-//OBJETOS QUE SÃO DESENHADOS
-#define TROPHY 0
-#define FLOOR  1
-#define TOWER 2
-#define ROBOTTOP 3
-#define ROBOTBOTTOM 4
-#define SPHERE 5
-#define CUBE 6
 
 
 
@@ -277,8 +290,129 @@ int main(int argc, char* argv[])
     glfwSetFramebufferSizeCallback(window, FramebufferSizeCallback);
     FramebufferSizeCallback(window,window_w,window_h); // Forçamos a chamada do callback acima, para definir g_ScreenRatio.
 
+    //Carregando as texturas e  .objs que utilizamos
+    LoadTexturesAndModels();
 
-    // Carregamos os shaders de vértices e de fragmentos que serão utilizados para renderização.
+    // Inicializamos o código para renderização de texto.
+    TextRendering_Init();
+
+    // Habilitamos o Z-buffer. Veja slides 104-116 do documento Aula_09_Projecoes.pdf.
+    glEnable(GL_DEPTH_TEST);
+
+    // Habilitamos o Backface Culling. Veja slides 23-34 do documento Aula_13_Clipping_and_Culling.pdf.
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glFrontFace(GL_CCW);
+
+    // Variáveis auxiliares utilizadas para chamada à função
+    // TextRendering_ShowModelViewProjection(), armazenando matrizes 4x4.
+    glm::mat4 the_projection;
+    glm::mat4 the_model;
+    glm::mat4 the_view;
+
+    //Váriaveis utilizadas para garantir que animações sejam idependetes de tempo de execução
+    float t_prev = glfwGetTime();
+    float t_dif,t_atual;
+    // Ficamos em loop, renderizando, até que o usuário feche a janela
+    while (!glfwWindowShouldClose(window))
+    {
+        glClearColor(0.6f, 0.8f, 1.0f, 0.8f); //COR DE FUNDO AZUL
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); //PINTA O BUFFER COM A COR ACIMA
+
+        glUseProgram(program_id); //GPU UTILIZA OS SHADERS ACIMA
+
+        //Obtem a diferença de tempo atual
+        t_atual = glfwGetTime();
+        t_dif = t_atual - t_prev;
+        t_prev = t_atual;
+
+        //TIPO DE CAMERA UTILIZADA
+        switch(camera_type){
+            //TODO
+            case CHARACTER_CAMERA:
+                camera_type = LOOK_AT_CAMERA;
+                break;
+
+            case LOOK_AT_CAMERA:
+                camera_lookat_l    = current_position; // Ponto "l", para onde a câmera (look-at) estará sempre olhando
+                r = g_CameraDistance;
+                x = r*cos(g_CameraPhi)*sin(g_CameraTheta) + current_position[0]; //Somando camera_lookat_l para que o circulo seja centrado na esfera
+                y = r*sin(g_CameraPhi) + current_position[1];
+                z = r*cos(g_CameraPhi)*cos(g_CameraTheta) + current_position[2];
+                camera_position_c  = glm::vec4(x,y,z,1.0f); // Ponto "c", centro da câmera
+                camera_view_vector = camera_lookat_l - camera_position_c; // Vetor "view", sentido para onde a câmera está virada
+                break;
+            case FREE_CAMERA:
+                /////////////////////////////////////////////////////////////////////////////////
+                //Calculando W e U para realizar as alterações
+
+                glm::vec4 w = -camera_view_vector/norm(camera_view_vector) /* cálculo do vetor w */;
+                glm::vec4 u = crossproduct(camera_up_vector,w)/norm(crossproduct(camera_up_vector,w)) ;/* cálculo do vetor u */;
+
+                // Normalizamos os vetores u e w
+                w = w / norm(w);
+                u = u / norm(u);
+
+                //Moving using W,A,S,D
+                // Se o usuário apertar sa teclas W,A,S,D.
+                if (glfwGetKey(window,GLFW_KEY_W ) == GLFW_PRESS)
+                {
+                    camera_position_c-= w*camera_speed*t_dif; //multiplicando por t_dif para garantir que o tempo de execução
+                    camera_lookat_l-=w*camera_speed*t_dif;    //não afete a velocidade de movimento
+                }
+                 if (glfwGetKey(window,GLFW_KEY_A ) == GLFW_PRESS)
+                {
+                    camera_position_c-= u*camera_speed*t_dif;
+                    camera_lookat_l-=u*camera_speed*t_dif;
+                }
+                if (glfwGetKey(window,GLFW_KEY_S ) == GLFW_PRESS)
+                {
+                     camera_position_c+= w*camera_speed*t_dif;
+                     camera_lookat_l+=w*camera_speed*t_dif;
+                }
+                if (glfwGetKey(window,GLFW_KEY_D ) == GLFW_PRESS)
+                {
+                    camera_position_c+= u*camera_speed*t_dif;
+                    camera_lookat_l+=u*camera_speed*t_dif;
+                }
+                camera_view_vector = camera_lookat_l - camera_position_c;
+                //Adicionando as rotações relacionadas ao movimento do mouse
+                camera_view_vector = camera_view_vector*Matrix_Rotate_X(g_CameraPhi)*Matrix_Rotate_Y(-g_CameraTheta);
+
+                break;
+        }
+
+
+
+        // Computamos a matriz "View" utilizando os parâmetros da câmera para definir o sistema de coordenadas da câmera.
+        glm::mat4 view = Matrix_Camera_View(camera_position_c, camera_view_vector, camera_up_vector);
+        //Calculando a matrix de projeção(pode ser perspectiva ou ortográfica
+        glm::mat4 projection = ComputeProjectionMatrix();
+        //Envia as matrizes para a gpu
+        glUniformMatrix4fv(view_uniform       , 1 , GL_FALSE , glm::value_ptr(view));
+        glUniformMatrix4fv(projection_uniform , 1 , GL_FALSE , glm::value_ptr(projection));
+
+        //Desenhando cada objeto na cena
+        DrawObjectModels();
+        ///////////////////////////////////////////
+        //Imprimindo informações na tela
+        TextRendering_ShowEulerAngles(window);
+        TextRendering_ShowProjection(window);
+        TextRendering_ShowFramesPerSecond(window);
+        glfwSwapBuffers(window); //Troca de buffers permitindo a visualização dos objetos
+        glfwPollEvents(); //Verificando eventos de iteração do usuário
+    }
+
+    // Finalizamos o uso dos recursos do sistema operacional
+    glfwTerminate();
+
+    // Fim do programa
+    return 0;
+}
+//CARREGANDO AS TEXTURAS E .OBJ QUE SERÃO UTILIZADOS
+void LoadTexturesAndModels(){
+
+     // Carregamos os shaders de vértices e de fragmentos que serão utilizados para renderização.
     LoadShadersFromFiles();
 
     // CARREGANDO TEXTURAS QUE SERÃO UTILIZADAS
@@ -318,155 +452,14 @@ int main(int argc, char* argv[])
     BuildTrianglesAndAddToVirtualScene(&cubemodel);
 
 
+}
 
 
 
-    if ( argc > 1 )
-    {
-        ObjModel model(argv[1]);
-        BuildTrianglesAndAddToVirtualScene(&model);
-    }
-
-    // Inicializamos o código para renderização de texto.
-    TextRendering_Init();
-
-    // Habilitamos o Z-buffer. Veja slides 104-116 do documento Aula_09_Projecoes.pdf.
-    glEnable(GL_DEPTH_TEST);
-
-    // Habilitamos o Backface Culling. Veja slides 23-34 do documento Aula_13_Clipping_and_Culling.pdf.
-    glEnable(GL_CULL_FACE);
-    glCullFace(GL_BACK);
-    glFrontFace(GL_CCW);
-
-    // Variáveis auxiliares utilizadas para chamada à função
-    // TextRendering_ShowModelViewProjection(), armazenando matrizes 4x4.
-    glm::mat4 the_projection;
-    glm::mat4 the_model;
-    glm::mat4 the_view;
-
-    //Váriaveis utilizadas para garantir que animações sejam idependetes de tempo de execução
-    float t_prev = glfwGetTime();
-    float t_dif,t_atual;
-    // Ficamos em loop, renderizando, até que o usuário feche a janela
-    while (!glfwWindowShouldClose(window))
-    {
-        // Aqui executamos as operações de renderização
-
-        glClearColor(0.6f, 0.8f, 1.0f, 0.8f); //COR DE FUNDO AZUL
-
-        // "Pintamos" todos os pixels do framebuffer com a cor definida acima,
-        // e também resetamos todos os pixels do Z-buffer (depth buffer).
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        // Pedimos para a GPU utilizar o programa de GPU criado acima (contendo
-        // os shaders de vértice e fragmentos).
-        glUseProgram(program_id);
-
-        //Obtem a diferença de tempo atual
-        t_atual = glfwGetTime();
-        t_dif = t_atual - t_prev;
-        t_prev = t_atual;
-
-        //TIPO DE CAMERA UTILIZADA
-        switch(camera_type){
-            //TODO
-            case CHARACTER_CAMERA:
-                camera_type = LOOK_AT_CAMERA;
-                break;
-
-            case LOOK_AT_CAMERA:
-                camera_lookat_l    = current_position; // Ponto "l", para onde a câmera (look-at) estará sempre olhando
-                r = g_CameraDistance;
-                x = r*cos(g_CameraPhi)*sin(g_CameraTheta) + current_position[0]; //Somando camera_lookat_l para que o circulo seja centrado na esfera
-                y = r*sin(g_CameraPhi) + current_position[1];
-                z = r*cos(g_CameraPhi)*cos(g_CameraTheta) + current_position[2];
-                camera_position_c  = glm::vec4(x,y,z,1.0f); // Ponto "c", centro da câmera
-                camera_view_vector = camera_lookat_l - camera_position_c; // Vetor "view", sentido para onde a câmera está virada
-                break;
-            case FREE_CAMERA:
-                /////////////////////////////////////////////////////////////////////////////////
-                //Calculando W e U para realizar as alterações
-
-                glm::vec4 w = -camera_view_vector/norm(camera_view_vector) /* cálculo do vetor w */;
-                glm::vec4 u = crossproduct(camera_up_vector,w)/norm(crossproduct(camera_up_vector,w)) ;/* cálculo do vetor u */;
-
-                // Normalizamos os vetores u e w
-                w = w / norm(w);
-                u = u / norm(u);
-
-                //Moving using W,A,S,D)
-                // Se o usuário apertar sa teclas W,A,S,D.
-                if (glfwGetKey(window,GLFW_KEY_W ) == GLFW_PRESS)
-                {
-                    camera_position_c-= w*camera_speed*t_dif; //multiplicando por t_dif para garantir que o tempo de execução
-                    camera_lookat_l-=w*camera_speed*t_dif;    //não afete a velocidade de movimento
-                }
-                 if (glfwGetKey(window,GLFW_KEY_A ) == GLFW_PRESS)
-                {
-                    camera_position_c-= u*camera_speed*t_dif;
-                    camera_lookat_l-=u*camera_speed*t_dif;
-                }
-                if (glfwGetKey(window,GLFW_KEY_S ) == GLFW_PRESS)
-                {
-                     camera_position_c+= w*camera_speed*t_dif;
-                     camera_lookat_l+=w*camera_speed*t_dif;
-                }
-                if (glfwGetKey(window,GLFW_KEY_D ) == GLFW_PRESS)
-                {
-                    camera_position_c+= u*camera_speed*t_dif;
-                    camera_lookat_l+=u*camera_speed*t_dif;
-                }
-                camera_view_vector = camera_lookat_l - camera_position_c;
-                //Adicionando as rotações relacionadas ao movimento do mouse
-                camera_view_vector = camera_view_vector*Matrix_Rotate_X(g_CameraPhi)*Matrix_Rotate_Y(-g_CameraTheta);
-
-                break;
-        }
-
-
-
-        // Computamos a matriz "View" utilizando os parâmetros da câmera para definir o sistema de coordenadas da câmera.
-        glm::mat4 view = Matrix_Camera_View(camera_position_c, camera_view_vector, camera_up_vector);
-
-
-
-        //COMPUTANDO MATRIZ DE PROJEÇÃO
-        // Agora computamos a matriz de Projeção.
-        glm::mat4 projection;
-
-        // Note que, no sistema de coordenadas da câmera, os planos near e far
-        // estão no sentido negativo! Veja slides 176-204 do documento Aula_09_Projecoes.pdf.
-        float nearplane = -0.1f;  // Posição do "near plane"
-        float farplane  = -200.0f; // Posição do "far plane"
-
-        //TIPO DE PROJEÇÃO
-        if (g_UsePerspectiveProjection)
-        {
-            // Projeção Perspectiva.
-            float field_of_view = 3.141592 / 3.0f;
-            projection = Matrix_Perspective(field_of_view, g_ScreenRatio, nearplane, farplane);
-        }
-        else
-        {
-            // Projeção Ortográfica.
-            float t = 1.5f*g_CameraDistance/2.5f;
-            float b = -t;
-            float r = t*g_ScreenRatio;
-            float l = -r;
-            projection = Matrix_Orthographic(l, r, b, t, nearplane, farplane);
-        }
-
-        glm::mat4 model = Matrix_Identity(); // Transformação identidade de modelagem
-
-        // Enviamos as matrizes "view" e "projection" para a placa de vídeo
-        // (GPU). Veja o arquivo "shader_vertex.glsl", onde estas são
-        // efetivamente aplicadas em todos os pontos.
-        glUniformMatrix4fv(view_uniform       , 1 , GL_FALSE , glm::value_ptr(view));
-        glUniformMatrix4fv(projection_uniform , 1 , GL_FALSE , glm::value_ptr(projection));
-
-
-
-        // DESENHANDO O TROFÉU
+//Desenhando cada objeto na cena
+void DrawObjectModels(){
+    glm::mat4 model; //
+    // DESENHANDO O TROFÉU
         //O .obj do troféu possui ele divido em várias partes
         //Diminuindo bastante o tamanho do troféu, seu .obj é grande
         //Translating ele para o topo da torre
@@ -520,26 +513,38 @@ int main(int argc, char* argv[])
         DrawVirtualObject("cube");
 
 
+}
 
-        ///////////////////////////////////////////
-        //Imprimindo informações na tela
-        TextRendering_ShowEulerAngles(window);
-        TextRendering_ShowProjection(window);
-        TextRendering_ShowFramesPerSecond(window);
+glm::mat4 ComputeProjectionMatrix(){
+    //COMPUTANDO MATRIZ DE PROJEÇÃO
+    // Agora computamos a matriz de Projeção.
 
-        //Troca de buffers permitindo a visualização dos objetos
-        glfwSwapBuffers(window);
+    // Note que, no sistema de coordenadas da câmera, os planos near e far
+    // estão no sentido negativo! Veja slides 176-204 do documento Aula_09_Projecoes.pdf.
+    float nearplane = -0.1f;  // Posição do "near plane"
+    float farplane  = -200.0f; // Posição do "far plane"
 
-        //Verificando eventos de iteração do usuário
-        glfwPollEvents();
+
+
+    //TIPO DE PROJEÇÃO
+    if (g_UsePerspectiveProjection)
+    {
+        // Projeção Perspectiva.
+        float field_of_view = 3.141592 / 3.0f;
+        return Matrix_Perspective(field_of_view, g_ScreenRatio, nearplane, farplane);
+    }
+    else
+    {
+        // Projeção Ortográfica.
+        float t = 1.5f*g_CameraDistance/2.5f;
+        float b = -t;
+        float r = t*g_ScreenRatio;
+        float l = -r;
+        return Matrix_Orthographic(l, r, b, t, nearplane, farplane);
     }
 
-    // Finalizamos o uso dos recursos do sistema operacional
-    glfwTerminate();
-
-    // Fim do programa
-    return 0;
 }
+
 
 // Função que carrega uma imagem para ser utilizada como textura
 void LoadTextureImage(const char* filename)
