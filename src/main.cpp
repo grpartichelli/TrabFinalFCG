@@ -239,6 +239,15 @@ float t_dif,t_atual;
 
 
 
+//Para criação das plataformas(cubos)
+#define  NUM_PLATFORMS 14
+glm::mat4 random_cube_models[NUM_PLATFORMS];
+float initialize = true; //Flag para sabermos se é necessario inicializar (model carregado somente uma vez)
+float move_cubesX = 0.0f; //Movimenta-se os cubos em relação a X pressionando Q
+float move_cubesZ = 0.0f; //Movimenta-se os cubos em relação a Z pressionando E
+
+
+
 int main(int argc, char* argv[])
 {
     // Inicializamos a biblioteca GLFW, utilizada para criar uma janela do
@@ -588,15 +597,38 @@ void DrawObjectModels(){
 
 
         //UTILIZANDO CUBOS PARA GERAR AS PLATAFORMAS
-        int num_platforms=10;
-        for(int i =0 ; i<num_platforms; i++){
-            model =  Matrix_Translate(2,2,2)*Matrix_Scale(1,0.2,1);
+
+        //só é necessario calcular uma unica vez as random_cube_model
+
+        if(initialize){
+            for(int i =0 ; i<NUM_PLATFORMS; i++){
+                random_cube_models[i] = Matrix_Scale((rand()%100)/200+0.75,((rand()%100)/250)+0.2,(rand()%100)/200+0.75); //Achatamento aleatorio
+                float translate_x = (rand()%10) - 5;
+                float translate_z = (rand()%10) - 5;
+                //gerando plataformas que não estao dentro da torre ( entre -1 e 1)
+                while(translate_x <= 1 && translate_x >= -1){
+                    translate_x = (rand()%10) - 5;
+                }
+                 while(translate_z <= 1 && translate_z >= -1){
+                    translate_z = (rand()%10) - 5;
+                }
+
+                random_cube_models[i] = Matrix_Translate(translate_x,i*0.75 + 1, translate_z)*random_cube_models[i]; //Deslocamento
+            }
+         }
+
+        for(int i =0 ; i<NUM_PLATFORMS; i++){
+
+            model = random_cube_models[i]; //Definida anteriormente, uma matriz com escalas e transalações aleatorias para cada plataforma
+            model = Matrix_Translate(move_cubesX,0,move_cubesZ)*model;
             glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
             glUniform1i(object_id_uniform, CUBE);
             DrawVirtualObject("cube");
+
+
         }
 
-
+        initialize = false;
 }
 
 glm::mat4 ComputeProjectionMatrix(){
@@ -1270,14 +1302,21 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
         g_AngleZ += (mod & GLFW_MOD_SHIFT) ? -delta : delta;
     }
 
-    // Se o usuário apertar a tecla R, resetamos os ângulos de Euler para zero.
-    if (key == GLFW_KEY_R && action == GLFW_PRESS)
+    //Movimentaçao dos cubos
+    if (key == GLFW_KEY_Q && action == GLFW_PRESS)
     {
-        g_AngleX = 0.0f;
-        g_AngleY = 0.0f;
-        g_AngleZ = 0.0f;
+        move_cubesX += (mod & GLFW_MOD_SHIFT) ? -0.25 : 0.25;
     }
 
+    if (key == GLFW_KEY_E && action == GLFW_PRESS)
+    {
+        move_cubesZ += (mod & GLFW_MOD_SHIFT) ? -0.25 : 0.25;
+    }
+  
+
+
+
+   
     // Se o usuário apertar a tecla P, utilizamos projeção perspectiva.
     if (key == GLFW_KEY_P && action == GLFW_PRESS)
     {
