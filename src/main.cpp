@@ -207,7 +207,7 @@ GLuint g_NumLoadedTextures = 0;
 //DEFINIÇÕES DA CAMÊRA E POSIÇÃO DO PERSONAGEM
 glm::vec4 character_position = glm::vec4(0.0f,0.0f,14.0f,1.0f); //DEFININDO POSIÇÃO INICIAL
 float character_speed =5;
-glm::mat4 desloc_cam = Matrix_Translate(0,2,0); //Matriz que controla o deslocamento entre o personagem e a camera do personagem
+glm::mat4 desloc_cam = Matrix_Translate(0,2.25,3); //Matriz que controla o deslocamento entre o personagem e a camera do personagem
 
 float g_CameraTheta = 0.0f; // Ângulo no plano ZX em relação ao eixo Z
 float g_CameraPhi = 0.0f;   // Ângulo em relação ao eixo Y
@@ -323,10 +323,8 @@ int main(int argc, char* argv[])
     float t_prev = glfwGetTime();
     float t_dif,t_atual;
 
-    //Inicializando o view vector
-    camera_position_c = desloc_cam*character_position;
-    camera_lookat_l = camera_position_c + glm::vec4(0,0,-1,0); //Isso garante que a rotação em torno do eixo X funcione.
-    camera_view_vector = camera_lookat_l - camera_position_c;
+
+
 
 
     // Ficamos em loop, renderizando, até que o usuário feche a janela
@@ -355,29 +353,31 @@ int main(int argc, char* argv[])
                 w = w / norm(w);
                 u = u / norm(u);
 
+                float y= character_position[1];
                 //Moving using W,A,S,D
                 // Se o usuário apertar sa teclas W,A,S,D.
                 if (glfwGetKey(window,GLFW_KEY_W ) == GLFW_PRESS)
                 {
-                    camera_position_c-= w*camera_speed*t_dif; //multiplicando por t_dif para garantir que o tempo de execução
-                    camera_lookat_l-=w*camera_speed*t_dif;    //não afete a velocidade de movimento
+                    character_position-= w*camera_speed*t_dif;
                 }
                  if (glfwGetKey(window,GLFW_KEY_A ) == GLFW_PRESS)
                 {
-                    camera_position_c-= u*camera_speed*t_dif;
-                    camera_lookat_l-=u*camera_speed*t_dif;
+                    character_position -= u*camera_speed*t_dif;
                 }
                 if (glfwGetKey(window,GLFW_KEY_S ) == GLFW_PRESS)
                 {
-                     camera_position_c+= w*camera_speed*t_dif;
-                     camera_lookat_l+=w*camera_speed*t_dif;
+                     character_position += w*camera_speed*t_dif;
                 }
                 if (glfwGetKey(window,GLFW_KEY_D ) == GLFW_PRESS)
                 {
-                    camera_position_c+= u*camera_speed*t_dif;
-                    camera_lookat_l+=u*camera_speed*t_dif;
+                    character_position += u*camera_speed*t_dif;
                 }
+                character_position[1] = y;
+
+                camera_position_c = desloc_cam*character_position; //Posição da camera em relação ao personagem
+                camera_lookat_l = camera_position_c + glm::vec4(0,0,-1,0); //Isso garante que a rotação em torno do eixo X funcione.
                 camera_view_vector = camera_lookat_l - camera_position_c;
+
                 //Adicionando as rotações relacionadas ao movimento do mouse
                 camera_view_vector = camera_view_vector*Matrix_Rotate_X(g_CameraPhi)*Matrix_Rotate_Y(-g_CameraTheta);
 
@@ -399,6 +399,7 @@ int main(int argc, char* argv[])
                 w = w / norm(w);
                 u = u / norm(u);
 
+
                 //Moving using W,A,S,D
                 // Se o usuário apertar sa teclas W,A,S,D.
                 if (glfwGetKey(window,GLFW_KEY_W ) == GLFW_PRESS)
@@ -421,6 +422,7 @@ int main(int argc, char* argv[])
                     camera_position_c+= u*camera_speed*t_dif;
                     camera_lookat_l+=u*camera_speed*t_dif;
                 }
+
                 camera_view_vector = camera_lookat_l - camera_position_c;
                 //Adicionando as rotações relacionadas ao movimento do mouse
                 camera_view_vector = camera_view_vector*Matrix_Rotate_X(g_CameraPhi)*Matrix_Rotate_Y(-g_CameraTheta);
