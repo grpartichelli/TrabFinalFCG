@@ -405,24 +405,21 @@ int main(int argc, char* argv[])
                 if (glfwGetKey(window,GLFW_KEY_W ) == GLFW_PRESS)
                 {
                     camera_position_c-= w*camera_speed*t_dif; //multiplicando por t_dif para garantir que o tempo de execução
-                    camera_lookat_l-=w*camera_speed*t_dif;    //não afete a velocidade de movimento
                 }
                  if (glfwGetKey(window,GLFW_KEY_A ) == GLFW_PRESS)
                 {
                     camera_position_c-= u*camera_speed*t_dif;
-                    camera_lookat_l-=u*camera_speed*t_dif;
                 }
                 if (glfwGetKey(window,GLFW_KEY_S ) == GLFW_PRESS)
                 {
                      camera_position_c+= w*camera_speed*t_dif;
-                     camera_lookat_l+=w*camera_speed*t_dif;
                 }
                 if (glfwGetKey(window,GLFW_KEY_D ) == GLFW_PRESS)
                 {
                     camera_position_c+= u*camera_speed*t_dif;
-                    camera_lookat_l+=u*camera_speed*t_dif;
                 }
 
+                camera_lookat_l = camera_position_c + glm::vec4(0,0,-1,0); //Isso garante que a rotação em torno do eixo X funcione.
                 camera_view_vector = camera_lookat_l - camera_position_c;
                 //Adicionando as rotações relacionadas ao movimento do mouse
                 camera_view_vector = camera_view_vector*Matrix_Rotate_X(g_CameraPhi)*Matrix_Rotate_Y(-g_CameraTheta);
@@ -1301,11 +1298,6 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
 
       if (key == GLFW_KEY_1 && action == GLFW_PRESS)
     {
-        //Inicializando o view vector
-        camera_position_c = desloc_cam*character_position;
-        camera_lookat_l = camera_position_c + glm::vec4(0,0,-1,0); //Isso garante que a rotação em torno do eixo X funcione.
-        camera_view_vector = camera_lookat_l - camera_position_c;
-
         camera_type = CHARACTER_CAMERA;
     }
 
@@ -1315,8 +1307,6 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
     }
     if (key == GLFW_KEY_3 && action == GLFW_PRESS)
     {
-        camera_lookat_l = camera_position_c + glm::vec4(0,0,-1,0); //Isso garante que a rotação em torno do eixo X funcione.
-        camera_view_vector = camera_lookat_l - camera_position_c;
         camera_type = FREE_CAMERA;
 
     }
