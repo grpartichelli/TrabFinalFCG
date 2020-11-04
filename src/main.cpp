@@ -205,12 +205,24 @@ GLuint g_NumLoadedTextures = 0;
 
 
 //DEFINIÇÕES DA CAMÊRA E POSIÇÃO DO PERSONAGEM
-glm::vec4 character_position = glm::vec4(0.0f,0.0f,14.0f,1.0f); //DEFININDO POSIÇÃO INICIAL
-float character_speed =5;
-glm::mat4 desloc_cam = Matrix_Translate(0,2.25,3); //Matriz que controla o deslocamento entre o personagem e a camera do personagem
 
-float g_CameraTheta = 0.0f; // Ângulo no plano ZX em relação ao eixo Z
-float g_CameraPhi = 0.0f;   // Ângulo em relação ao eixo Y
+//POSIÇÃO DO CENTRO DO CIRCULO QUE
+//O PERSONAGEM GIRA EM VOLTA (movimento controlado pelo mouse)
+glm::vec4 chr_circle_center_pos = glm::vec4(0.0f,0.0f,14.0f,1.0f);
+//POSIÇÃO REAL DO PERSONAGEM
+glm::vec4 chr_pos;
+
+float chr_speed =6;
+
+float cam_desloc_z = 0; //O deslocamento em relação a Z é usado para girar o robo junto com a câmera
+//Matriz que controla o deslocamento entre o circulo que o personagem gira em volta e a camera do personagem
+glm::mat4 desloc_cam = Matrix_Translate(0,1.5,cam_desloc_z);
+float chr_cam_phi_max =0.0825;
+float chr_cam_phi_min= chr_cam_phi_min-0.2;
+
+
+float g_CameraTheta = 0.0; // Ângulo no plano ZX em relação ao eixo Z
+float g_CameraPhi = 0.0825f;   // Ângulo em relação ao eixo Y
 float g_CameraDistance = 5.0f; // Distância da câmera para camera_lookat_l (raio da esfera)
 
 
@@ -218,7 +230,7 @@ int camera_type = CHARACTER_CAMERA;
 glm::vec4 camera_position_c, camera_lookat_l, camera_view_vector,w,u; //Vetores utilizados nos cálculos da câmera
 glm::vec4 camera_up_vector   = glm::vec4(0.0f,1.0f,0.0f,0.0f); // Vetor "up" fixado para apontar para o "céu" (eito Y global)
 float r,x,y,z;
-float camera_speed =4;
+float camera_speed =5;
 
 //Obtendo a resolução da tela
 int window_h;
@@ -260,7 +272,7 @@ int main(int argc, char* argv[])
 
     GLFWwindow* window;
     window = glfwCreateWindow(window_w*0.8, window_h*0.8, "Mr Robot Reaches the Top", NULL, NULL);
-    //glfwSetWindowMonitor(window,   NULL, 0, 0,  window_w*0.8, window_h*0.8, GLFW_DONT_CARE);
+
     glfwSetWindowPos(window, 50, 50);
 
 
@@ -330,6 +342,7 @@ int main(int argc, char* argv[])
     // Ficamos em loop, renderizando, até que o usuário feche a janela
     while (!glfwWindowShouldClose(window))
     {
+        printf("%f , %f \n",g_CameraPhi, g_CameraTheta);
         glClearColor(0.6f, 0.8f, 1.0f, 0.8f); //COR DE FUNDO AZUL
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); //PINTA O BUFFER COM A COR ACIMA
 
@@ -353,32 +366,40 @@ int main(int argc, char* argv[])
                 w = w / norm(w);
                 u = u / norm(u);
 
-                float y= character_position[1];
+                float y= chr_circle_center_pos[1];
                 //Moving using W,A,S,D
-                // Se o usuário apertar sa teclas W,A,S,D.
+                // Movimentamos o circulo em que o personagem gira em volta
                 if (glfwGetKey(window,GLFW_KEY_W ) == GLFW_PRESS)
                 {
-                    character_position-= w*camera_speed*t_dif;
+                    chr_circle_center_pos-= w*camera_speed*t_dif;
                 }
                  if (glfwGetKey(window,GLFW_KEY_A ) == GLFW_PRESS)
                 {
-                    character_position -= u*camera_speed*t_dif;
+                    chr_circle_center_pos -= u*camera_speed*t_dif;
                 }
                 if (glfwGetKey(window,GLFW_KEY_S ) == GLFW_PRESS)
                 {
-                     character_position += w*camera_speed*t_dif;
+                     chr_circle_center_pos += w*camera_speed*t_dif;
                 }
                 if (glfwGetKey(window,GLFW_KEY_D ) == GLFW_PRESS)
                 {
-                    character_position += u*camera_speed*t_dif;
+                    chr_circle_center_pos += u*camera_speed*t_dif;
                 }
-                character_position[1] = y;
+                chr_circle_center_pos[1] = y;
 
-                camera_position_c = desloc_cam*character_position; //Posição da camera em relação ao personagem
+
+                camera_position_c = desloc_cam*chr_circle_center_pos; //Posição da camera em relação ao personagem
                 camera_lookat_l = camera_position_c + glm::vec4(0,0,-1,0); //Isso garante que a rotação em torno do eixo X funcione.
                 camera_view_vector = camera_lookat_l - camera_position_c;
 
-                //Adicionando as rotações relacionadas ao movimento do mouse
+
+                //O movimento da camera do robo para cima e para baixo é limitado
+                if(g_CameraPhi > chr_cam_phi_max){
+                    g_CameraPhi = chr_cam_phi_max;
+                }
+                if(g_CameraPhi < chr_cam_phi_min){
+                    g_CameraPhi = chr_cam_phi_min;
+                }
                 camera_view_vector = camera_view_vector*Matrix_Rotate_X(g_CameraPhi)*Matrix_Rotate_Y(-g_CameraTheta);
 
 
@@ -458,11 +479,12 @@ int main(int argc, char* argv[])
 //Calculates camera position,lookatposition and view_vector for look at camera
 void LoadLookAtCamera(){
 
-    camera_lookat_l    = character_position; // Ponto "l", para onde a câmera (look-at) estará sempre olhando
+    camera_lookat_l    = chr_pos; // Ponto "l", para onde a câmera (look-at) estará sempre olhando
+
     r = g_CameraDistance;
-    x = r*cos(g_CameraPhi)*sin(g_CameraTheta) + character_position[0]; //Somando camera_lookat_l para que o circulo seja centrado na esfera
-    y = r*sin(g_CameraPhi) + character_position[1];
-    z = r*cos(g_CameraPhi)*cos(g_CameraTheta) + character_position[2];
+    x = (r*cos(g_CameraPhi)*sin(g_CameraTheta)) + chr_pos[0]; //Somando camera_lookat_l para que o circulo seja centrado na esfera
+    y = (r*sin(g_CameraPhi)) + chr_pos[1];
+    z = (r*cos(g_CameraPhi)*cos(g_CameraTheta)) + chr_pos[2];
     camera_position_c  = glm::vec4(x,y,z,1.0f); // Ponto "c", centro da câmera
     camera_view_vector = camera_lookat_l - camera_position_c; // Vetor "view", sentido para onde a câmera está virada
 
@@ -546,14 +568,29 @@ void DrawObjectModels(){
         glUniform1i(object_id_uniform, TOWER);
         DrawVirtualObject("tower");
 
+        float scale = 0.008;
         // DESENHANDO O ROBO
         //Robo é divido em duas parte, top (cabeça) e bottom (esfera inferior)
-        model =  Matrix_Translate(character_position[0],character_position[1],character_position[2])*Matrix_Scale(0.01,0.01,0.01); //Diminuindo o tamanho da torre
+
+        if(camera_type == CHARACTER_CAMERA){ //Calculando a posição final do personagem do personagem
+            chr_pos = Matrix_Translate(chr_circle_center_pos[0],chr_circle_center_pos[1],chr_circle_center_pos[2]+cam_desloc_z)//Rotaciona ele para sua posição no circulo
+                     *Matrix_Rotate_Y(g_CameraTheta)       //Rotaciona em torno de Y
+                     *Matrix_Translate(0,0,-cam_desloc_z) //O personagem gira em volta de um circulo de raio cam desloc Z
+                     *glm::vec4(0,0,0,1);
+        }
+
+        model  = Matrix_Translate(chr_pos[0],chr_pos[1],chr_pos[2])
+                        *Matrix_Rotate_Y(-1.25) //Rotação que move a cabeça do robo para onde a camera esta olhando
+                        *Matrix_Scale(scale,scale,scale); //Diminuindo o tamanho do robo
+
+
+
+
+
         glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(object_id_uniform, ROBOTTOP);
         DrawVirtualObject("robotTop");
 
-        model =  Matrix_Translate(character_position[0],character_position[1],character_position[2])*Matrix_Scale(0.01,0.01,0.01); //Diminuindo o tamanho da torre
         glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(object_id_uniform, ROBOTBOTTOM);
         DrawVirtualObject("robotBottom");
@@ -1299,11 +1336,16 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
       if (key == GLFW_KEY_1 && action == GLFW_PRESS)
     {
         camera_type = CHARACTER_CAMERA;
+
+        g_CameraPhi = 0.0825f;
     }
 
     if (key == GLFW_KEY_2 && action == GLFW_PRESS)
     {
-       camera_type = LOOK_AT_CAMERA;
+        camera_type = LOOK_AT_CAMERA;
+
+        g_CameraPhi =  0.0825f;
+
     }
     if (key == GLFW_KEY_3 && action == GLFW_PRESS)
     {
