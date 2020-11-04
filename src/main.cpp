@@ -204,11 +204,13 @@ GLint bbox_max_uniform;
 GLuint g_NumLoadedTextures = 0;
 
 
-//DEFINIÇÕES DA CAMÊRA
+//DEFINIÇÕES DA CAMÊRA E POSIÇÃO DO PERSONAGEM
 glm::vec4 character_position = glm::vec4(0.0f,0.0f,14.0f,1.0f); //DEFININDO POSIÇÃO INICIAL
+float character_speed =5;
+glm::mat4 desloc_cam = Matrix_Translate(0,2,0); //Matriz que controla o deslocamento entre o personagem e a camera do personagem
 
 float g_CameraTheta = 0.0f; // Ângulo no plano ZX em relação ao eixo Z
-float g_CameraPhi = 0.5f;   // Ângulo em relação ao eixo Y
+float g_CameraPhi = 0.0f;   // Ângulo em relação ao eixo Y
 float g_CameraDistance = 5.0f; // Distância da câmera para camera_lookat_l (raio da esfera)
 
 
@@ -321,7 +323,12 @@ int main(int argc, char* argv[])
     float t_prev = glfwGetTime();
     float t_dif,t_atual;
 
-    LoadLookAtCamera(); //Initialing vectors with look at camera
+    //Inicializando o view vector
+    camera_position_c = desloc_cam*character_position;
+    camera_lookat_l = camera_position_c + glm::vec4(0,0,-1,0); //Isso garante que a rotação em torno do eixo X funcione.
+    camera_view_vector = camera_lookat_l - camera_position_c;
+
+
     // Ficamos em loop, renderizando, até que o usuário feche a janela
     while (!glfwWindowShouldClose(window))
     {
@@ -338,14 +345,50 @@ int main(int argc, char* argv[])
         //TIPO DE CAMERA UTILIZADA
         switch(camera_type){
             //TODO
-            case CHARACTER_CAMERA:
-                camera_type = LOOK_AT_CAMERA;
+            case CHARACTER_CAMERA:{
+                /////////////////////////////////////////////////////////////////////////////////
+                //Calculando W e U para realizar as alterações
+                glm::vec4 w = -camera_view_vector/norm(camera_view_vector) /* cálculo do vetor w */;
+                glm::vec4 u = crossproduct(camera_up_vector,w)/norm(crossproduct(camera_up_vector,w)) ;/* cálculo do vetor u */;
+
+                // Normalizamos os vetores u e w
+                w = w / norm(w);
+                u = u / norm(u);
+
+                //Moving using W,A,S,D
+                // Se o usuário apertar sa teclas W,A,S,D.
+                if (glfwGetKey(window,GLFW_KEY_W ) == GLFW_PRESS)
+                {
+                    camera_position_c-= w*camera_speed*t_dif; //multiplicando por t_dif para garantir que o tempo de execução
+                    camera_lookat_l-=w*camera_speed*t_dif;    //não afete a velocidade de movimento
+                }
+                 if (glfwGetKey(window,GLFW_KEY_A ) == GLFW_PRESS)
+                {
+                    camera_position_c-= u*camera_speed*t_dif;
+                    camera_lookat_l-=u*camera_speed*t_dif;
+                }
+                if (glfwGetKey(window,GLFW_KEY_S ) == GLFW_PRESS)
+                {
+                     camera_position_c+= w*camera_speed*t_dif;
+                     camera_lookat_l+=w*camera_speed*t_dif;
+                }
+                if (glfwGetKey(window,GLFW_KEY_D ) == GLFW_PRESS)
+                {
+                    camera_position_c+= u*camera_speed*t_dif;
+                    camera_lookat_l+=u*camera_speed*t_dif;
+                }
+                camera_view_vector = camera_lookat_l - camera_position_c;
+                //Adicionando as rotações relacionadas ao movimento do mouse
+                camera_view_vector = camera_view_vector*Matrix_Rotate_X(g_CameraPhi)*Matrix_Rotate_Y(-g_CameraTheta);
+
+
                 break;
+            }
 
             case LOOK_AT_CAMERA:
                 LoadLookAtCamera();
                 break;
-            case FREE_CAMERA:
+            case FREE_CAMERA:{
                 /////////////////////////////////////////////////////////////////////////////////
                 //Calculando W e U para realizar as alterações
 
@@ -383,6 +426,7 @@ int main(int argc, char* argv[])
                 camera_view_vector = camera_view_vector*Matrix_Rotate_X(g_CameraPhi)*Matrix_Rotate_Y(-g_CameraTheta);
 
                 break;
+            }
         }
 
 
@@ -1255,6 +1299,11 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
 
       if (key == GLFW_KEY_1 && action == GLFW_PRESS)
     {
+        //Inicializando o view vector
+        camera_position_c = desloc_cam*character_position;
+        camera_lookat_l = camera_position_c + glm::vec4(0,0,-1,0); //Isso garante que a rotação em torno do eixo X funcione.
+        camera_view_vector = camera_lookat_l - camera_position_c;
+
         camera_type = CHARACTER_CAMERA;
     }
 
