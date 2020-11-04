@@ -203,11 +203,11 @@ GLuint g_NumLoadedTextures = 0;
 
 
 //DEFINIÇÕES DA CAMÊRA
-glm::vec4 current_position = glm::vec4(0.0f,2.0f,10.0f,1.0f); //DEFININDO POSIÇÃO INICIAL
+glm::vec4 character_position = glm::vec4(0.0f,0.0f,10.0f,1.0f); //DEFININDO POSIÇÃO INICIAL
 
 float g_CameraTheta = 0.0f; // Ângulo no plano ZX em relação ao eixo Z
-float g_CameraPhi = 0.0f;   // Ângulo em relação ao eixo Y
-float g_CameraDistance = 3.0f; // Distância da câmera para camera_lookat_l (raio da esfera)
+float g_CameraPhi = 0.5f;   // Ângulo em relação ao eixo Y
+float g_CameraDistance = 5.0f; // Distância da câmera para camera_lookat_l (raio da esfera)
 
 
 int camera_type = LOOK_AT_CAMERA;
@@ -256,7 +256,10 @@ int main(int argc, char* argv[])
 
     GLFWwindow* window;
     window = glfwCreateWindow(window_w*0.8, window_h*0.8, "Mr Robot Reaches the Top", NULL, NULL);
+    //glfwSetWindowMonitor(window,   NULL, 0, 0,  window_w*0.8, window_h*0.8, GLFW_DONT_CARE);
     glfwSetWindowPos(window, 50, 50);
+
+
 
     if (!window)
     {
@@ -284,11 +287,13 @@ int main(int argc, char* argv[])
     // biblioteca GLAD.
     gladLoadGLLoader((GLADloadproc) glfwGetProcAddress);
 
+
     // Definimos a função de callback que será chamada sempre que a janela for
     // redimensionada, por consequência alterando o tamanho do "framebuffer"
-    // (região de memória onde são armazenados os pixels da imagem).
     glfwSetFramebufferSizeCallback(window, FramebufferSizeCallback);
-    FramebufferSizeCallback(window,window_w,window_h); // Forçamos a chamada do callback acima, para definir g_ScreenRatio.
+    FramebufferSizeCallback(window,window_w*0.8,window_h*0.8); // Forçamos a chamada do callback acima, para definir g_ScreenRatio.
+
+
 
     //Carregando as texturas e  .objs que utilizamos
     LoadTexturesAndModels();
@@ -334,11 +339,11 @@ int main(int argc, char* argv[])
                 break;
 
             case LOOK_AT_CAMERA:
-                camera_lookat_l    = current_position; // Ponto "l", para onde a câmera (look-at) estará sempre olhando
+                camera_lookat_l    = character_position; // Ponto "l", para onde a câmera (look-at) estará sempre olhando
                 r = g_CameraDistance;
-                x = r*cos(g_CameraPhi)*sin(g_CameraTheta) + current_position[0]; //Somando camera_lookat_l para que o circulo seja centrado na esfera
-                y = r*sin(g_CameraPhi) + current_position[1];
-                z = r*cos(g_CameraPhi)*cos(g_CameraTheta) + current_position[2];
+                x = r*cos(g_CameraPhi)*sin(g_CameraTheta) + character_position[0]; //Somando camera_lookat_l para que o circulo seja centrado na esfera
+                y = r*sin(g_CameraPhi) + character_position[1];
+                z = r*cos(g_CameraPhi)*cos(g_CameraTheta) + character_position[2];
                 camera_position_c  = glm::vec4(x,y,z,1.0f); // Ponto "c", centro da câmera
                 camera_view_vector = camera_lookat_l - camera_position_c; // Vetor "view", sentido para onde a câmera está virada
                 break;
@@ -488,19 +493,19 @@ void DrawObjectModels(){
 
         // DESENHANDO O ROBO
         //Robo é divido em duas parte, top (cabeça) e bottom (esfera inferior)
-        model =  Matrix_Translate(current_position[0],current_position[1]-1,current_position[2])*Matrix_Scale(0.01,0.01,0.01); //Diminuindo o tamanho da torre
+        model =  Matrix_Translate(character_position[0],character_position[1],character_position[2])*Matrix_Scale(0.01,0.01,0.01); //Diminuindo o tamanho da torre
         glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(object_id_uniform, ROBOTTOP);
         DrawVirtualObject("robotTop");
 
-        model =  Matrix_Translate(current_position[0],current_position[1]-1,current_position[2])*Matrix_Scale(0.01,0.01,0.01); //Diminuindo o tamanho da torre
+        model =  Matrix_Translate(character_position[0],character_position[1],character_position[2])*Matrix_Scale(0.01,0.01,0.01); //Diminuindo o tamanho da torre
         glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(object_id_uniform, ROBOTBOTTOM);
         DrawVirtualObject("robotBottom");
 
 
         //UTILIZANDO ESFERAS PARA OS "METEOROS"
-        model =  Matrix_Translate(0,5,10);
+        model =  Matrix_Translate(0,10,10);
         glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(object_id_uniform, SPHERE);
         DrawVirtualObject("sphere");
