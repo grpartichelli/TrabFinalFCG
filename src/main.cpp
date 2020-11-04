@@ -210,7 +210,7 @@ glm::mat4 ComputeProjectionMatrix(); //Cria matriz de projeção
 
 //DEFINIÇÕES DA CAMÊRA E POSIÇÃO DO PERSONAGEM
 //POSIÇÃO REAL DO PERSONAGEM
-glm::vec4 chr_pos = glm::vec4(0.0f,0.0f,14.0f,1.0f);
+glm::vec4 chr_pos = glm::vec4(0.0f,0.0f,15.0f,1.0f);
 
 int camera_type = CHARACTER_CAMERA;
 float chr_speed =6; //velocidade do robo
@@ -385,7 +385,7 @@ int main(int argc, char* argv[])
     return 0;
 }
 
-void LoadCharacterCamera(GLFWwindow* window){ //LoadCharacterCamera é uma mistura de free camera com uma lookat posicionada no personagem
+void LoadCharacterCamera(GLFWwindow* window){ //LoadCharacterCamera é uma mistura de free camera com uma lookat posicionada no personagem(um pouco deslocada)
 
     //Calculando W e U para realizar as  na posição do personagem
     glm::vec4 w = -camera_view_vector/norm(camera_view_vector) /* cálculo do vetor w */;
@@ -416,8 +416,8 @@ void LoadCharacterCamera(GLFWwindow* window){ //LoadCharacterCamera é uma mistu
     }
     chr_pos[1] = y;
 
-
-    LoadLookAtCamera(chr_pos); //Faz o calculo do vetor de view com base no look at camera
+    //Deslocado um pouco para cima para que o usuario tenha um campo de visão maior
+    LoadLookAtCamera(Matrix_Translate(0,1.5,0)*chr_pos); //Faz o calculo do vetor de view com base no look at camera
 
 
 
@@ -439,9 +439,9 @@ void LoadLookAtCamera(glm::vec4 look_at_point){
     camera_lookat_l    = look_at_point; // Ponto para onde a câmera (look-at) estará sempre olhando
 
     r = g_CameraDistance;
-    x = (r*cos(g_CameraPhi)*sin(g_CameraTheta)) + chr_pos[0]; //Somando camera_lookat_l para que o personagem seja o centro da esfera
-    y = (r*sin(g_CameraPhi)) + chr_pos[1];
-    z = (r*cos(g_CameraPhi)*cos(g_CameraTheta)) + chr_pos[2];
+    x = (r*cos(g_CameraPhi)*sin(g_CameraTheta)) + camera_lookat_l[0]; //Somando camera_lookat_l para que o ponto esteja no centro da esfera
+    y = (r*sin(g_CameraPhi)) + camera_lookat_l[1];
+    z = (r*cos(g_CameraPhi)*cos(g_CameraTheta)) + camera_lookat_l[2];
     camera_position_c  = glm::vec4(x,y,z,1.0f); // Ponto "c", centro da câmera
     camera_view_vector = camera_lookat_l - camera_position_c; // Vetor "view", sentido para onde a câmera está virada
 
