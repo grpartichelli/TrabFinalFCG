@@ -205,25 +205,19 @@ GLuint g_NumLoadedTextures = 0;
 
 
 //DEFINIÇÕES DA CAMÊRA E POSIÇÃO DO PERSONAGEM
-
-//POSIÇÃO DO CENTRO DO CIRCULO QUE
-//O PERSONAGEM GIRA EM VOLTA (movimento controlado pelo mouse)
-glm::vec4 chr_circle_center_pos = glm::vec4(0.0f,0.0f,14.0f,1.0f);
 //POSIÇÃO REAL DO PERSONAGEM
-glm::vec4 chr_pos;
+glm::vec4 chr_pos = glm::vec4(0.0f,0.0f,14.0f,1.0f);
 
 float chr_speed =6;
 
-float cam_desloc_z = 0; //O deslocamento em relação a Z é usado para girar o robo junto com a câmera
-//Matriz que controla o deslocamento entre o circulo que o personagem gira em volta e a camera do personagem
-glm::mat4 desloc_cam = Matrix_Translate(0,1.5,cam_desloc_z);
-float chr_cam_phi_max =0.0825;
-float chr_cam_phi_min= chr_cam_phi_min-0.2;
+float chr_cam_phi_min= 0.0625;
+float chr_cam_phi_max =chr_cam_phi_min+1; //Controlando phi para a camera do personagem
+
 
 
 float g_CameraTheta = 0.0; // Ângulo no plano ZX em relação ao eixo Z
-float g_CameraPhi = 0.0825f;   // Ângulo em relação ao eixo Y
-float g_CameraDistance = 5.0f; // Distância da câmera para camera_lookat_l (raio da esfera)
+float g_CameraPhi = 0.035f;   // Ângulo em relação ao eixo Y
+float g_CameraDistance = 4.5f; // Distância da câmera para camera_lookat_l (raio da esfera)
 
 
 int camera_type = CHARACTER_CAMERA;
@@ -366,31 +360,30 @@ int main(int argc, char* argv[])
                 w = w / norm(w);
                 u = u / norm(u);
 
-                float y= chr_circle_center_pos[1];
+                float y= chr_pos[1];
                 //Moving using W,A,S,D
-                // Movimentamos o circulo em que o personagem gira em volta
+                // Movimentamos o personagem
                 if (glfwGetKey(window,GLFW_KEY_W ) == GLFW_PRESS)
                 {
-                    chr_circle_center_pos-= w*camera_speed*t_dif;
+                    chr_pos-= w*camera_speed*t_dif;
                 }
                  if (glfwGetKey(window,GLFW_KEY_A ) == GLFW_PRESS)
                 {
-                    chr_circle_center_pos -= u*camera_speed*t_dif;
+                    chr_pos -= u*camera_speed*t_dif;
                 }
                 if (glfwGetKey(window,GLFW_KEY_S ) == GLFW_PRESS)
                 {
-                     chr_circle_center_pos += w*camera_speed*t_dif;
+                     chr_pos += w*camera_speed*t_dif;
                 }
                 if (glfwGetKey(window,GLFW_KEY_D ) == GLFW_PRESS)
                 {
-                    chr_circle_center_pos += u*camera_speed*t_dif;
+                    chr_pos += u*camera_speed*t_dif;
                 }
-                chr_circle_center_pos[1] = y;
+                chr_pos[1] = y;
 
 
-                camera_position_c = desloc_cam*chr_circle_center_pos; //Posição da camera em relação ao personagem
-                camera_lookat_l = camera_position_c + glm::vec4(0,0,-1,0); //Isso garante que a rotação em torno do eixo X funcione.
-                camera_view_vector = camera_lookat_l - camera_position_c;
+                LoadLookAtCamera();
+
 
 
                 //O movimento da camera do robo para cima e para baixo é limitado
@@ -400,7 +393,8 @@ int main(int argc, char* argv[])
                 if(g_CameraPhi < chr_cam_phi_min){
                     g_CameraPhi = chr_cam_phi_min;
                 }
-                camera_view_vector = camera_view_vector*Matrix_Rotate_X(g_CameraPhi)*Matrix_Rotate_Y(-g_CameraTheta);
+
+
 
 
                 break;
@@ -482,7 +476,7 @@ void LoadLookAtCamera(){
     camera_lookat_l    = chr_pos; // Ponto "l", para onde a câmera (look-at) estará sempre olhando
 
     r = g_CameraDistance;
-    x = (r*cos(g_CameraPhi)*sin(g_CameraTheta)) + chr_pos[0]; //Somando camera_lookat_l para que o circulo seja centrado na esfera
+    x = (r*cos(g_CameraPhi)*sin(g_CameraTheta)) + chr_pos[0]; //Somando camera_lookat_l para que o personagem seja o centro da esfera
     y = (r*sin(g_CameraPhi)) + chr_pos[1];
     z = (r*cos(g_CameraPhi)*cos(g_CameraTheta)) + chr_pos[2];
     camera_position_c  = glm::vec4(x,y,z,1.0f); // Ponto "c", centro da câmera
@@ -570,26 +564,15 @@ void DrawObjectModels(){
 
         float scale = 0.008;
         // DESENHANDO O ROBO
-        //Robo é divido em duas parte, top (cabeça) e bottom (esfera inferior)
-
-        if(camera_type == CHARACTER_CAMERA){ //Calculando a posição final do personagem do personagem
-            chr_pos = Matrix_Translate(chr_circle_center_pos[0],chr_circle_center_pos[1],chr_circle_center_pos[2]+cam_desloc_z)//Rotaciona ele para sua posição no circulo
-                     *Matrix_Rotate_Y(g_CameraTheta)       //Rotaciona em torno de Y
-                     *Matrix_Translate(0,0,-cam_desloc_z) //O personagem gira em volta de um circulo de raio cam desloc Z
-                     *glm::vec4(0,0,0,1);
-        }
-
         model  = Matrix_Translate(chr_pos[0],chr_pos[1],chr_pos[2])
-                        *Matrix_Rotate_Y(-1.25) //Rotação que move a cabeça do robo para onde a camera esta olhando
+                        *Matrix_Rotate_Y(g_CameraTheta -1.25) //Rotação que move a cabeça do robo para onde a camera esta olhando
                         *Matrix_Scale(scale,scale,scale); //Diminuindo o tamanho do robo
-
-
-
 
 
         glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(object_id_uniform, ROBOTTOP);
         DrawVirtualObject("robotTop");
+
 
         glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(object_id_uniform, ROBOTBOTTOM);
