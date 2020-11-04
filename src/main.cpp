@@ -137,13 +137,6 @@ void CursorPosCallback(GLFWwindow* window, double xpos, double ypos);
 void ScrollCallback(GLFWwindow* window, double xoffset, double yoffset);
 
 
-//Nossas funções
-
-void LoadLookAtCamera(); //Calculates camera position,lookatposition and view_vector for look at camera
-void LoadTexturesAndModels(); //Carrega os modelos .obj e texturas que serão utilizadas
-void DrawObjectModels();    //Desenha o modelo dos objetos na cena
-glm::mat4 ComputeProjectionMatrix(); //Cria matriz de projeção
-
 
 
 // Definimos uma estrutura que armazenará dados necessários para renderizar
@@ -204,23 +197,32 @@ GLint bbox_max_uniform;
 GLuint g_NumLoadedTextures = 0;
 
 
+//////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////
+//Nossas funções
+void LoadCharacterCamera(GLFWwindow* window); //Calcula os vetor view_vector e as posições do centro e lookat da camera do personagem
+void LoadLookAtCamera(glm::vec4 look_at_point); //Calcula os vetor view_vector e as posições do centro e lookat da camera lookat
+void LoadFreeCamera(GLFWwindow* window); //Calcula os vetor view_vector e as posições do centro e lookat da camera free
+void LoadTexturesAndModels(); //Carrega os modelos .obj e texturas que serão utilizadas
+void DrawObjectModels();    //Desenha o modelo dos objetos na cena
+glm::mat4 ComputeProjectionMatrix(); //Cria matriz de projeção
+
+
 //DEFINIÇÕES DA CAMÊRA E POSIÇÃO DO PERSONAGEM
 //POSIÇÃO REAL DO PERSONAGEM
 glm::vec4 chr_pos = glm::vec4(0.0f,0.0f,14.0f,1.0f);
 
-float chr_speed =6;
-
-float chr_cam_phi_min= 0.0625;
-float chr_cam_phi_max =chr_cam_phi_min+1; //Controlando phi para a camera do personagem
+int camera_type = CHARACTER_CAMERA;
+float chr_speed =6; //velocidade do robo
+float chr_rotate_angle; //angulo de rotação do robo(acompanhará a camera)
+float chr_cam_phi_min= 0.0625; //Controlando phi para a camera do personagem
+float chr_cam_phi_max =chr_cam_phi_min+1;
 
 
 
 float g_CameraTheta = 0.0; // Ângulo no plano ZX em relação ao eixo Z
 float g_CameraPhi = 0.035f;   // Ângulo em relação ao eixo Y
 float g_CameraDistance = 4.5f; // Distância da câmera para camera_lookat_l (raio da esfera)
-
-
-int camera_type = CHARACTER_CAMERA;
 glm::vec4 camera_position_c, camera_lookat_l, camera_view_vector,w,u; //Vetores utilizados nos cálculos da câmera
 glm::vec4 camera_up_vector   = glm::vec4(0.0f,1.0f,0.0f,0.0f); // Vetor "up" fixado para apontar para o "céu" (eito Y global)
 float r,x,y,z;
@@ -231,6 +233,9 @@ int window_h;
 int window_w;
 int screentype = 0; // 0 é em janela, 1 é em janela com mouse livre, 2 é fullscreen
 
+//Váriaveis utilizadas para garantir que animações sejam idependetes de tempo de execução
+float t_prev = glfwGetTime();
+float t_dif,t_atual;
 
 
 
@@ -325,18 +330,12 @@ int main(int argc, char* argv[])
     glm::mat4 the_model;
     glm::mat4 the_view;
 
-    //Váriaveis utilizadas para garantir que animações sejam idependetes de tempo de execução
-    float t_prev = glfwGetTime();
-    float t_dif,t_atual;
-
-
-
 
 
     // Ficamos em loop, renderizando, até que o usuário feche a janela
     while (!glfwWindowShouldClose(window))
     {
-        printf("%f , %f \n",g_CameraPhi, g_CameraTheta);
+
         glClearColor(0.6f, 0.8f, 1.0f, 0.8f); //COR DE FUNDO AZUL
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); //PINTA O BUFFER COM A COR ACIMA
 
@@ -349,101 +348,16 @@ int main(int argc, char* argv[])
 
         //TIPO DE CAMERA UTILIZADA
         switch(camera_type){
-            //TODO
-            case CHARACTER_CAMERA:{
-                /////////////////////////////////////////////////////////////////////////////////
-                //Calculando W e U para realizar as alterações
-                glm::vec4 w = -camera_view_vector/norm(camera_view_vector) /* cálculo do vetor w */;
-                glm::vec4 u = crossproduct(camera_up_vector,w)/norm(crossproduct(camera_up_vector,w)) ;/* cálculo do vetor u */;
-
-                // Normalizamos os vetores u e w
-                w = w / norm(w);
-                u = u / norm(u);
-
-                float y= chr_pos[1];
-                //Moving using W,A,S,D
-                // Movimentamos o personagem
-                if (glfwGetKey(window,GLFW_KEY_W ) == GLFW_PRESS)
-                {
-                    chr_pos-= w*camera_speed*t_dif;
-                }
-                 if (glfwGetKey(window,GLFW_KEY_A ) == GLFW_PRESS)
-                {
-                    chr_pos -= u*camera_speed*t_dif;
-                }
-                if (glfwGetKey(window,GLFW_KEY_S ) == GLFW_PRESS)
-                {
-                     chr_pos += w*camera_speed*t_dif;
-                }
-                if (glfwGetKey(window,GLFW_KEY_D ) == GLFW_PRESS)
-                {
-                    chr_pos += u*camera_speed*t_dif;
-                }
-                chr_pos[1] = y;
-
-
-                LoadLookAtCamera();
-
-
-
-                //O movimento da camera do robo para cima e para baixo é limitado
-                if(g_CameraPhi > chr_cam_phi_max){
-                    g_CameraPhi = chr_cam_phi_max;
-                }
-                if(g_CameraPhi < chr_cam_phi_min){
-                    g_CameraPhi = chr_cam_phi_min;
-                }
-
-
-
-
+            case CHARACTER_CAMERA:
+                LoadCharacterCamera(window);
                 break;
-            }
-
             case LOOK_AT_CAMERA:
-                LoadLookAtCamera();
+                LoadLookAtCamera(chr_pos);
                 break;
-            case FREE_CAMERA:{
-                /////////////////////////////////////////////////////////////////////////////////
-                //Calculando W e U para realizar as alterações
-
-                glm::vec4 w = -camera_view_vector/norm(camera_view_vector) /* cálculo do vetor w */;
-                glm::vec4 u = crossproduct(camera_up_vector,w)/norm(crossproduct(camera_up_vector,w)) ;/* cálculo do vetor u */;
-
-                // Normalizamos os vetores u e w
-                w = w / norm(w);
-                u = u / norm(u);
-
-
-                //Moving using W,A,S,D
-                // Se o usuário apertar sa teclas W,A,S,D.
-                if (glfwGetKey(window,GLFW_KEY_W ) == GLFW_PRESS)
-                {
-                    camera_position_c-= w*camera_speed*t_dif; //multiplicando por t_dif para garantir que o tempo de execução
-                }
-                 if (glfwGetKey(window,GLFW_KEY_A ) == GLFW_PRESS)
-                {
-                    camera_position_c-= u*camera_speed*t_dif;
-                }
-                if (glfwGetKey(window,GLFW_KEY_S ) == GLFW_PRESS)
-                {
-                     camera_position_c+= w*camera_speed*t_dif;
-                }
-                if (glfwGetKey(window,GLFW_KEY_D ) == GLFW_PRESS)
-                {
-                    camera_position_c+= u*camera_speed*t_dif;
-                }
-
-                camera_lookat_l = camera_position_c + glm::vec4(0,0,-1,0); //Isso garante que a rotação em torno do eixo X funcione.
-                camera_view_vector = camera_lookat_l - camera_position_c;
-                //Adicionando as rotações relacionadas ao movimento do mouse
-                camera_view_vector = camera_view_vector*Matrix_Rotate_X(g_CameraPhi)*Matrix_Rotate_Y(-g_CameraTheta);
-
+            case FREE_CAMERA:
+                LoadFreeCamera(window);
                 break;
-            }
         }
-
-
 
         // Computamos a matriz "View" utilizando os parâmetros da câmera para definir o sistema de coordenadas da câmera.
         glm::mat4 view = Matrix_Camera_View(camera_position_c, camera_view_vector, camera_up_vector);
@@ -470,10 +384,59 @@ int main(int argc, char* argv[])
     // Fim do programa
     return 0;
 }
-//Calculates camera position,lookatposition and view_vector for look at camera
-void LoadLookAtCamera(){
 
-    camera_lookat_l    = chr_pos; // Ponto "l", para onde a câmera (look-at) estará sempre olhando
+void LoadCharacterCamera(GLFWwindow* window){ //LoadCharacterCamera é uma mistura de free camera com uma lookat posicionada no personagem
+
+    //Calculando W e U para realizar as  na posição do personagem
+    glm::vec4 w = -camera_view_vector/norm(camera_view_vector) /* cálculo do vetor w */;
+    glm::vec4 u = crossproduct(camera_up_vector,w)/norm(crossproduct(camera_up_vector,w)) ;/* cálculo do vetor u */;
+
+    // Normalizamos os vetores u e w
+    w = w / norm(w);
+    u = u / norm(u);
+
+    float y= chr_pos[1];
+    //Moving using W,A,S,D
+    // Movimentamos o personagem
+    if (glfwGetKey(window,GLFW_KEY_W ) == GLFW_PRESS)
+    {
+        chr_pos-= w*camera_speed*t_dif;
+    }
+     if (glfwGetKey(window,GLFW_KEY_A ) == GLFW_PRESS)
+    {
+        chr_pos -= u*camera_speed*t_dif;
+    }
+    if (glfwGetKey(window,GLFW_KEY_S ) == GLFW_PRESS)
+    {
+         chr_pos += w*camera_speed*t_dif;
+    }
+    if (glfwGetKey(window,GLFW_KEY_D ) == GLFW_PRESS)
+    {
+        chr_pos += u*camera_speed*t_dif;
+    }
+    chr_pos[1] = y;
+
+
+    LoadLookAtCamera(chr_pos); //Faz o calculo do vetor de view com base no look at camera
+
+
+
+    //O movimento da camera do robo para cima e para baixo é limitado
+    if(g_CameraPhi > chr_cam_phi_max){
+        g_CameraPhi = chr_cam_phi_max;
+    }
+    if(g_CameraPhi < chr_cam_phi_min){
+        g_CameraPhi = chr_cam_phi_min;
+    }
+
+}
+
+
+//Calculates camera position,lookatposition and view_vector for look at camera
+//Recebe como entrada o ponto a qual a camera irá look-at
+void LoadLookAtCamera(glm::vec4 look_at_point){
+
+    camera_lookat_l    = look_at_point; // Ponto para onde a câmera (look-at) estará sempre olhando
 
     r = g_CameraDistance;
     x = (r*cos(g_CameraPhi)*sin(g_CameraTheta)) + chr_pos[0]; //Somando camera_lookat_l para que o personagem seja o centro da esfera
@@ -484,7 +447,40 @@ void LoadLookAtCamera(){
 
 
 }
+void LoadFreeCamera(GLFWwindow* window){
+    //Calculando W e U para realizar as alterações na posição da camera
+    glm::vec4 w = -camera_view_vector/norm(camera_view_vector) /* cálculo do vetor w */;
+    glm::vec4 u = crossproduct(camera_up_vector,w)/norm(crossproduct(camera_up_vector,w)) ;/* cálculo do vetor u */;
 
+    // Normalizamos os vetores u e w
+    w = w / norm(w);
+    u = u / norm(u);
+
+
+    //Moving using W,A,S,D
+    // Se o usuário apertar sa teclas W,A,S,D.
+    if (glfwGetKey(window,GLFW_KEY_W ) == GLFW_PRESS)
+    {
+        camera_position_c-= w*camera_speed*t_dif; //multiplicando por t_dif para garantir que o tempo de execução
+    }
+     if (glfwGetKey(window,GLFW_KEY_A ) == GLFW_PRESS)
+    {
+        camera_position_c-= u*camera_speed*t_dif;
+    }
+    if (glfwGetKey(window,GLFW_KEY_S ) == GLFW_PRESS)
+    {
+         camera_position_c+= w*camera_speed*t_dif;
+    }
+    if (glfwGetKey(window,GLFW_KEY_D ) == GLFW_PRESS)
+    {
+        camera_position_c+= u*camera_speed*t_dif;
+    }
+
+    camera_lookat_l = camera_position_c + glm::vec4(0,0,-1,0); //Isso garante que a rotação em torno do eixo X funcione.
+    camera_view_vector = camera_lookat_l - camera_position_c;
+    //Adicionando as rotações relacionadas ao movimento do mouse
+    camera_view_vector = camera_view_vector*Matrix_Rotate_X(g_CameraPhi)*Matrix_Rotate_Y(-g_CameraTheta);
+}
 //CARREGANDO AS TEXTURAS E .OBJ QUE SERÃO UTILIZADOS
 void LoadTexturesAndModels(){
 
@@ -563,9 +559,14 @@ void DrawObjectModels(){
         DrawVirtualObject("tower");
 
         float scale = 0.008;
+
+        //A cabeça do robo nao deve se mexer em outras posições da camera
+        if(camera_type == CHARACTER_CAMERA){
+            chr_rotate_angle = g_CameraTheta -1.25;
+        }
         // DESENHANDO O ROBO
         model  = Matrix_Translate(chr_pos[0],chr_pos[1],chr_pos[2])
-                        *Matrix_Rotate_Y(g_CameraTheta -1.25) //Rotação que move a cabeça do robo para onde a camera esta olhando
+                        *Matrix_Rotate_Y(chr_rotate_angle) //Rotação que move a cabeça do robo para onde a camera esta olhando
                         *Matrix_Scale(scale,scale,scale); //Diminuindo o tamanho do robo
 
 
@@ -587,10 +588,13 @@ void DrawObjectModels(){
 
 
         //UTILIZANDO CUBOS PARA GERAR AS PLATAFORMAS
-        model =  Matrix_Translate(2,2,2)*Matrix_Scale(1,0.2,1);
-        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(object_id_uniform, CUBE);
-        DrawVirtualObject("cube");
+        int num_platforms=10;
+        for(int i =0 ; i<num_platforms; i++){
+            model =  Matrix_Translate(2,2,2)*Matrix_Scale(1,0.2,1);
+            glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+            glUniform1i(object_id_uniform, CUBE);
+            DrawVirtualObject("cube");
+        }
 
 
 }
