@@ -65,6 +65,7 @@
 #define ROBOT_SCALE 0.008f
 #define TROPHY_SCALE 0.003f
 #define TOWER_SCALE 0.4f
+#define SPHERE_SCALE 0.5f
 
 
 // Estrutura que representa um modelo geométrico carregado a partir de um
@@ -200,6 +201,7 @@ GLuint g_NumLoadedTextures = 0;
 //////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////
 //Nossas funções
+void BezierMeteorMove(); // Move o meteoro de acordo com o tempo e uma curva de bézier de grau 3
 bool CompareAABB_AABB(int bbox_id1, glm::mat4 model1, int bbox_id2,glm::mat4 model2); //Compara duas bbox, retorna true caso intersecçao
 bool CanPlatformMove(int platform_id,  glm::mat4 towerModel); //Calcula se a plataforma pode andar (compara com torre e com robo)
 bool CanRobotMove(glm::mat4 towerModel); //Calcula se a intersecção do robo com algo caso ele se mova
@@ -219,8 +221,8 @@ glm::vec4 chr_pos_old = glm::vec4(0.0f,0.0f,15.0f,1.0f); //Posição do personag
 int camera_type = CHARACTER_CAMERA;
 float chr_speed =12; //velocidade do robo
 float chr_rotate_angle; //angulo de rotação do robo(acompanhará a camera)
-float chr_cam_phi_min= 0.0625; //Controlando phi para a camera do personagem
-float chr_cam_phi_max =chr_cam_phi_min+1;
+float chr_cam_phi_max =0.1;//Controlando phi para a camera do personagem
+float chr_cam_phi_min= chr_cam_phi_max - 0.25;
 
 float gravity =5; //gravidade irá empurrar o personagem para baixo a cada 2 iterações
 bool gravity_iteration = false; //uma a cada duas iterações irá empurrar o personagem para baixo
@@ -235,8 +237,8 @@ float on_top_of_y = 0; //indica o chão mais próximo de onde o robo está ( a g
 //////////////////////////////////////////////////////////////////////
 //DEFINIÇÕES DAS OUTRAS CAMERAS
 float g_CameraTheta = 0.0; // Ângulo no plano ZX em relação ao eixo Z
-float g_CameraPhi = 0.035f;   // Ângulo em relação ao eixo Y
-float g_CameraDistance = 4.5f; // Distância da câmera para camera_lookat_l (raio da esfera)
+float g_CameraPhi = -0.15f;   // Ângulo em relação ao eixo Y
+float g_CameraDistance = 5.0f; // Distância da câmera para camera_lookat_l (raio da esfera)
 glm::vec4 camera_position_c, camera_lookat_l, camera_view_vector,w,u; //Vetores utilizados nos cálculos da câmera
 glm::vec4 camera_up_vector   = glm::vec4(0.0f,1.0f,0.0f,0.0f); // Vetor "up" fixado para apontar para o "céu" (eito Y global)
 float r,x,y,z;
@@ -263,6 +265,12 @@ float move_cubeZ[NUM_PLATFORMS]; //Movimenta-se os cubos em relação a Z pressi
 float move_cubeXOld[NUM_PLATFORMS]; //Posição do cubo uma iteração atras
 float move_cubeZOld[NUM_PLATFORMS]; //Posiçao do cubo uma iteração atras
 int on_top_of_platform = -1; //Indica que o robo está em cima desse cubo, o que impede o movimento do mesmo
+///////////////////////////////////////////////////////
+//ESFERA/METEORO
+glm::vec4 sphere_pos= glm::vec4(0.0f,15.0f,0.0f,1.0f);
+
+
+
 ////////////////////////////////////////////////////
 //BBOX DE TODOS OBJETOS QUE UTILIZAM COMPARAÇÕES
 std::map<int,glm::vec4> mapBboxMax;
@@ -302,7 +310,7 @@ int main(int argc, char* argv[])
     GLFWwindow* window;
     window = glfwCreateWindow(window_w*0.8, window_h*0.8, "Mr Robot Reaches the Top", NULL, NULL);
 
-    glfwSetWindowPos(window, 50, 50);
+    glfwSetWindowPos(window, 400, 50);
 
 
 
@@ -373,6 +381,7 @@ int main(int argc, char* argv[])
     while (!glfwWindowShouldClose(window))
     {
 
+
         glClearColor(0.6f, 0.8f, 1.0f, 0.8f); //COR DE FUNDO AZUL
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); //PINTA O BUFFER COM A COR ACIMA
 
@@ -382,6 +391,11 @@ int main(int argc, char* argv[])
         t_atual = glfwGetTime();
         t_dif = t_atual - t_prev;
         t_prev = t_atual;
+
+
+        //Mover o meteoro numa curva de bézier
+        BezierMeteorMove();
+
 
         //TIPO DE CAMERA UTILIZADA
         switch(camera_type){
@@ -421,6 +435,16 @@ int main(int argc, char* argv[])
     // Fim do programa
     return 0;
 }
+//Movendo o meteoro numa curva de bézier de grau 3
+void BezierMeteorMove(){
+
+
+    //Resetando a esfera quando chegar no chão
+    if(sphere_pos[1] == 0){
+        glm::vec4(0.0f,15.0f,0.0f,1.0f);
+    }
+}
+
 //Compara duas bounding boxes, retorna true caso se intersecção
 bool CompareAABB_AABB(int bbox_id1, glm::mat4 model1, int bbox_id2,glm::mat4 model2){
     //Obtendo as bboxes e multiplicando por seus modelos
@@ -713,7 +737,7 @@ void DrawObjectModels(){
 
 
     //UTILIZANDO UMA ESFERA COMO METEORO
-    model =  Matrix_Translate(0,10,10);
+    model =  Matrix_Translate(sphere_pos[0],sphere_pos[1],sphere_pos[2])*Matrix_Scale(SPHERE_SCALE,SPHERE_SCALE,SPHERE_SCALE);
     glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
     glUniform1i(object_id_uniform, SPHERE);
     DrawVirtualObject("sphere",-1 ); //bbox id da sphere é zero pois utilizamos comparação com esfera
