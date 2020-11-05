@@ -101,7 +101,7 @@ void BuildTrianglesAndAddToVirtualScene(ObjModel*); // Constrói representação
 void ComputeNormals(ObjModel* model); // Computa normais de um ObjModel, caso não existam.
 void LoadShadersFromFiles(); // Carrega os shaders de vértice e fragmento, criando um programa de GPU
 void LoadTextureImage(const char* filename); // Função que carrega imagens de textura
-void DrawVirtualObject(const char* object_name); // Desenha um objeto armazenado em g_VirtualScene
+void DrawVirtualObject(const char* object_name, int bbox_id); // Desenha um objeto armazenado em g_VirtualScene
 GLuint LoadShader_Vertex(const char* filename);   // Carrega um vertex shader
 GLuint LoadShader_Fragment(const char* filename); // Carrega um fragment shader
 void LoadShader(const char* filename, GLuint shader_id); // Função utilizada pelas duas acima
@@ -200,6 +200,7 @@ GLuint g_NumLoadedTextures = 0;
 //////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////
 //Nossas funções
+bool CompareAABB_AABB(int bbox_id1, glm::mat4 model1, int bbox_id2,glm::mat4 model2); //Compara duas bbox, retorna true caso intersecçao
 void LoadCharacterCamera(GLFWwindow* window); //Calcula os vetor view_vector e as posições do centro e lookat da camera do personagem
 void LoadLookAtCamera(glm::vec4 look_at_point); //Calcula os vetor view_vector e as posições do centro e lookat da camera lookat
 void LoadFreeCamera(GLFWwindow* window); //Calcula os vetor view_vector e as posições do centro e lookat da camera free
@@ -210,7 +211,8 @@ glm::mat4 ComputeProjectionMatrix(); //Cria matriz de projeção
 
 //DEFINIÇÕES DA CAMÊRA E POSIÇÃO DO PERSONAGEM
 //POSIÇÃO REAL DO PERSONAGEM
-glm::vec4 chr_pos = glm::vec4(0.0f,0.0f,15.0f,1.0f);
+glm::vec4 chr_pos = glm::vec4(0.0f,0.0f,15.0f,1.0f);     //Posição atual do personagem
+glm::vec4 chr_pos_old = glm::vec4(0.0f,0.0f,15.0f,1.0f); //Posição do personagem uma iteração atras
 
 int camera_type = CHARACTER_CAMERA;
 float chr_speed =6; //velocidade do robo
@@ -246,6 +248,9 @@ float initialize = true; //Flag para sabermos se é necessario inicializar (mode
 float move_cubesX = 0.0f; //Movimenta-se os cubos em relação a X pressionando Q
 float move_cubesZ = 0.0f; //Movimenta-se os cubos em relação a Z pressionando E
 
+//bbox de cada objeto (antes de serem multiplicados por model)
+std::map<int,glm::vec4> mapBboxMax;
+std::map<int,glm::vec4> mapBboxMin;
 
 
 int main(int argc, char* argv[])
@@ -281,7 +286,7 @@ int main(int argc, char* argv[])
     GLFWwindow* window;
     window = glfwCreateWindow(window_w*0.8, window_h*0.8, "Mr Robot Reaches the Top", NULL, NULL);
 
-    glfwSetWindowPos(window, 50, 50);
+    glfwSetWindowPos(window, 500, 50);
 
 
 
@@ -393,6 +398,22 @@ int main(int argc, char* argv[])
     // Fim do programa
     return 0;
 }
+//Compara duas bounding boxes, retorna true caso se intersecção
+bool CompareAABB_AABB(int bbox_id1, glm::mat4 model1, int bbox_id2,glm::mat4 model2){
+    //Obtendo as bboxes e multiplicando por seus modelos
+    glm::vec4 bbox_max1 = model1*mapBboxMax[bbox_id1];
+    glm::vec4 bbox_min1 = model1*mapBboxMin[bbox_id1];
+
+    glm::vec4 bbox_max2 = model2*mapBboxMax[bbox_id2];
+    glm::vec4 bbox_min2 = model2*mapBboxMin[bbox_id2];
+
+
+    // TESTE DE INTERSECÇÃO ENTRE AABB
+    return (bbox_min1.x <= bbox_max2.x && bbox_max1.x >= bbox_min2.x) &&
+         (bbox_min1.y <= bbox_max2.y && bbox_max1.y >= bbox_min2.y) &&
+         (bbox_min1.z <= bbox_max2.z && bbox_max1.z >= bbox_min2.z);
+}
+
 
 void LoadCharacterCamera(GLFWwindow* window){ //LoadCharacterCamera é uma mistura de free camera com uma lookat posicionada no personagem(um pouco deslocada)
 
@@ -405,6 +426,7 @@ void LoadCharacterCamera(GLFWwindow* window){ //LoadCharacterCamera é uma mistu
     u = u / norm(u);
 
     float y= chr_pos[1];
+    chr_pos_old = chr_pos; //salva a posição atual caso o objeto nao possa se mover
     //Moving using W,A,S,D
     // Movimentamos o personagem
     if (glfwGetKey(window,GLFW_KEY_W ) == GLFW_PRESS)
@@ -423,7 +445,7 @@ void LoadCharacterCamera(GLFWwindow* window){ //LoadCharacterCamera é uma mistu
     {
         chr_pos += u*camera_speed*t_dif;
     }
-    chr_pos[1] = y;
+    //chr_pos[1] = y;
 
     //Deslocado um pouco para cima para que o usuario tenha um campo de visão maior
     LoadLookAtCamera(Matrix_Translate(0,1.5,0)*chr_pos); //Faz o calculo do vetor de view com base no look at camera
@@ -541,94 +563,105 @@ void LoadTexturesAndModels(){
 void DrawObjectModels(){
     glm::mat4 model; //
     // DESENHANDO O TROFÉU
-        //O .obj do troféu possui ele divido em várias partes
-        //Diminuindo bastante o tamanho do troféu, seu .obj é grande
-        //Translating ele para o topo da torre
-        model =  Matrix_Translate(0,9,0)*Matrix_Scale(0.002f,0.002f,0.002f);
-        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(object_id_uniform, TROPHY);
-        DrawVirtualObject("trophy");
-        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(object_id_uniform, TROPHY);
-        DrawVirtualObject("trophybase");
-        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(object_id_uniform, TROPHY);
-        DrawVirtualObject("trophyhandle");
+    //O .obj do troféu possui ele divido em várias partes
+    //Diminuindo bastante o tamanho do troféu, seu .obj é grande
+    //Translating ele para o topo da torre
+    model =  Matrix_Translate(0,9,0)*Matrix_Scale(0.002f,0.002f,0.002f);
+    glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+    glUniform1i(object_id_uniform, TROPHY);
+    DrawVirtualObject("trophy",TROPHY);
 
-        // DESENHANDO O CHÃO
-        model = Matrix_Identity();
-        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(object_id_uniform, FLOOR);
-        DrawVirtualObject("floor");
+    glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+    glUniform1i(object_id_uniform, TROPHY);
+    DrawVirtualObject("trophybase",-1); //Bbox id sendo -1 significa que nao será utilizado
 
-        // DESENHANDO A TORRE
-        model =  Matrix_Scale(0.4,0.4,0.4); //Diminuindo o tamanho da torre
-        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(object_id_uniform, TOWER);
-        DrawVirtualObject("tower");
+    glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+    glUniform1i(object_id_uniform, TROPHY);
+    DrawVirtualObject("trophyhandle",-1);
 
-        float scale = 0.008;
+    // DESENHANDO O CHÃO
+    model = Matrix_Identity();
+    glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+    glUniform1i(object_id_uniform, FLOOR);
+    DrawVirtualObject("floor",-1);
 
-        //A cabeça do robo nao deve se mexer em outras posições da camera
-        if(camera_type == CHARACTER_CAMERA){
-            chr_rotate_angle = g_CameraTheta -1.25;
-        }
-        // DESENHANDO O ROBO
-        model  = Matrix_Translate(chr_pos[0],chr_pos[1],chr_pos[2])
-                        *Matrix_Rotate_Y(chr_rotate_angle) //Rotação que move a cabeça do robo para onde a camera esta olhando
-                        *Matrix_Scale(scale,scale,scale); //Diminuindo o tamanho do robo
+    // DESENHANDO A TORRE
+    glm::mat4 modelTower =  Matrix_Scale(0.4,0.4,0.4); //Diminuindo o tamanho da torre
+    glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(modelTower));
+    glUniform1i(object_id_uniform, TOWER);
+    DrawVirtualObject("tower",TOWER);
 
 
-        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(object_id_uniform, ROBOTTOP);
-        DrawVirtualObject("robotTop");
+
+    //A cabeça do robo nao deve se mexer em outras posições da camera
+    if(camera_type == CHARACTER_CAMERA){
+        chr_rotate_angle = g_CameraTheta -1.25;
+    }
 
 
-        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(object_id_uniform, ROBOTBOTTOM);
-        DrawVirtualObject("robotBottom");
+
+    float scale = 0.008;
+    //Nao utilizando a rotação da cabeça do robo nas comparações
+    glm::mat4 modelCompareRobot  = Matrix_Translate(chr_pos[0],chr_pos[1],chr_pos[2])*Matrix_Scale(scale,scale,scale); //Diminuindo o tamanho do robo
+
+    //Se ouver intersecção, com a torre, volta para a posição antiga
+    if(CompareAABB_AABB(ROBOTTOP,modelCompareRobot,TOWER,modelTower) && CompareAABB_AABB(ROBOTBOTTOM,modelCompareRobot,TOWER,modelTower)  ){
+        chr_pos = chr_pos_old;
+    }
+    glm::mat4 modelRobot  = Matrix_Translate(chr_pos[0],chr_pos[1],chr_pos[2])
+                            *Matrix_Rotate_Y(chr_rotate_angle) //Rotação que move a cabeça do robo para onde a camera esta olhando
+                           *Matrix_Scale(scale,scale,scale); //Diminuindo o tamanho do robo
+    glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(modelRobot));
+    glUniform1i(object_id_uniform, ROBOTTOP);
+    DrawVirtualObject("robotTop",ROBOTTOP);
 
 
-        //UTILIZANDO ESFERAS PARA OS "METEOROS"
-        model =  Matrix_Translate(0,10,10);
-        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(object_id_uniform, SPHERE);
-        DrawVirtualObject("sphere");
+    glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(modelRobot));
+    glUniform1i(object_id_uniform, ROBOTBOTTOM);
+    DrawVirtualObject("robotBottom",ROBOTBOTTOM);
 
 
-        //UTILIZANDO CUBOS PARA GERAR AS PLATAFORMAS
+    //UTILIZANDO ESFERAS PARA OS "METEOROS"
+    model =  Matrix_Translate(0,10,10);
+    glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+    glUniform1i(object_id_uniform, SPHERE);
+    DrawVirtualObject("sphere",-1 ); //bbox id da sphere é zero pois utilizamos comparação com esfera
 
-        //só é necessario calcular uma unica vez as random_cube_model
 
-        if(initialize){
-            for(int i =0 ; i<NUM_PLATFORMS; i++){
-                random_cube_models[i] = Matrix_Scale((rand()%100)/200+0.75,((rand()%100)/250)+0.2,(rand()%100)/200+0.75); //Achatamento aleatorio
-                float translate_x = (rand()%10) - 5;
-                float translate_z = (rand()%10) - 5;
-                //gerando plataformas que não estao dentro da torre ( entre -1 e 1)
-                while(translate_x <= 1 && translate_x >= -1){
-                    translate_x = (rand()%10) - 5;
-                }
-                 while(translate_z <= 1 && translate_z >= -1){
-                    translate_z = (rand()%10) - 5;
-                }
+    //UTILIZANDO CUBOS PARA GERAR AS PLATAFORMAS
 
-                random_cube_models[i] = Matrix_Translate(translate_x,i*0.75 + 1, translate_z)*random_cube_models[i]; //Deslocamento
-            }
-         }
+    //só é necessario calcular uma unica vez as random_cube_model
 
+    if(initialize){
         for(int i =0 ; i<NUM_PLATFORMS; i++){
+            random_cube_models[i] = Matrix_Scale((rand()%100)/200+0.75,((rand()%100)/250)+0.2,(rand()%100)/200+0.75); //Achatamento aleatorio
+            float translate_x = (rand()%10) - 5;
+            float translate_z = (rand()%10) - 5;
+            //gerando plataformas que não estao dentro da torre ( entre -1 e 1)
+            while(translate_x <= 1 && translate_x >= -1){
+                translate_x = (rand()%8) - 4;
+            }
+             while(translate_z <= 1 && translate_z >= -1){
+                translate_z = (rand()%8) - 4;
+            }
 
-            model = random_cube_models[i]; //Definida anteriormente, uma matriz com escalas e transalações aleatorias para cada plataforma
-            model = Matrix_Translate(move_cubesX,0,move_cubesZ)*model;
-            glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-            glUniform1i(object_id_uniform, CUBE);
-            DrawVirtualObject("cube");
-
-
+            random_cube_models[i] = Matrix_Translate(translate_x,i*0.75 + 1, translate_z)*random_cube_models[i]; //Deslocamento
         }
+     }
 
-        initialize = false;
+
+    for(int i =0 ; i<NUM_PLATFORMS; i++){
+
+        model = random_cube_models[i]; //Definida anteriormente, uma matriz com escalas e transalações aleatorias para cada plataforma
+        model = Matrix_Translate(move_cubesX,0,move_cubesZ)*model;
+        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+        glUniform1i(object_id_uniform, CUBE);
+        DrawVirtualObject("cube",CUBE+i);
+
+
+    }
+
+    initialize = false;
 }
 
 glm::mat4 ComputeProjectionMatrix(){
@@ -716,7 +749,7 @@ void LoadTextureImage(const char* filename)
 
 // Função que desenha um objeto armazenado em g_VirtualScene. Veja definição
 // dos objetos na função BuildTrianglesAndAddToVirtualScene().
-void DrawVirtualObject(const char* object_name)
+void DrawVirtualObject(const char* object_name, int bbox_id)
 {
     // "Ligamos" o VAO. Informamos que queremos utilizar os atributos de
     // vértices apontados pelo VAO criado pela função BuildTrianglesAndAddToVirtualScene(). Veja
@@ -729,6 +762,13 @@ void DrawVirtualObject(const char* object_name)
     glm::vec3 bbox_max = g_VirtualScene[object_name].bbox_max;
     glUniform4f(bbox_min_uniform, bbox_min.x, bbox_min.y, bbox_min.z, 1.0f);
     glUniform4f(bbox_max_uniform, bbox_max.x, bbox_max.y, bbox_max.z, 1.0f);
+
+    //Carregando uma unica vez as bboxes
+    if(bbox_id != -1 && initialize){//precisamos de somente algumas bboxs
+        mapBboxMax[bbox_id] = glm::vec4(bbox_max.x, bbox_max.y, bbox_max.z, 1.0f);
+        mapBboxMin[bbox_id]= glm::vec4(bbox_min.x, bbox_min.y, bbox_min.z, 1.0f);
+    }
+
 
     // Pedimos para a GPU rasterizar os vértices dos eixos XYZ
     // apontados pelo VAO como linhas. Veja a definição de
@@ -1302,21 +1342,22 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
         g_AngleZ += (mod & GLFW_MOD_SHIFT) ? -delta : delta;
     }
 
+    float cube_speed = 50;
     //Movimentaçao dos cubos
-    if (key == GLFW_KEY_Q && action == GLFW_PRESS)
+    if (glfwGetKey(window,GLFW_KEY_Q) == GLFW_PRESS)
     {
-        move_cubesX += (mod & GLFW_MOD_SHIFT) ? -0.25 : 0.25;
+        move_cubesX += (mod & GLFW_MOD_SHIFT) ? -cube_speed*t_dif : cube_speed*t_dif;
     }
 
-    if (key == GLFW_KEY_E && action == GLFW_PRESS)
+    if (glfwGetKey(window,GLFW_KEY_E) == GLFW_PRESS)
     {
-        move_cubesZ += (mod & GLFW_MOD_SHIFT) ? -0.25 : 0.25;
+        move_cubesZ += (mod & GLFW_MOD_SHIFT) ? -cube_speed*t_dif : cube_speed*t_dif;
     }
-  
 
 
 
-   
+
+
     // Se o usuário apertar a tecla P, utilizamos projeção perspectiva.
     if (key == GLFW_KEY_P && action == GLFW_PRESS)
     {
