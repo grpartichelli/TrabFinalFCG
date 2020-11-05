@@ -201,6 +201,7 @@ GLuint g_NumLoadedTextures = 0;
 /////////////////////////////////////////////////////////////////////////////////////
 //Nossas funções
 bool CompareAABB_AABB(int bbox_id1, glm::mat4 model1, int bbox_id2,glm::mat4 model2); //Compara duas bbox, retorna true caso intersecçao
+bool CanRobotMove(float scale, glm::mat4 towerModel); //Calcula se a intersecção do robo com algo caso ele se mova
 void LoadCharacterCamera(GLFWwindow* window); //Calcula os vetor view_vector e as posições do centro e lookat da camera do personagem
 void LoadLookAtCamera(glm::vec4 look_at_point); //Calcula os vetor view_vector e as posições do centro e lookat da camera lookat
 void LoadFreeCamera(GLFWwindow* window); //Calcula os vetor view_vector e as posições do centro e lookat da camera free
@@ -445,7 +446,7 @@ void LoadCharacterCamera(GLFWwindow* window){ //LoadCharacterCamera é uma mistu
     {
         chr_pos += u*camera_speed*t_dif;
     }
-    //chr_pos[1] = y;
+    chr_pos[1] = y;
 
     //Deslocado um pouco para cima para que o usuario tenha um campo de visão maior
     LoadLookAtCamera(Matrix_Translate(0,1.5,0)*chr_pos); //Faz o calculo do vetor de view com base no look at camera
@@ -586,8 +587,8 @@ void DrawObjectModels(){
     DrawVirtualObject("floor",-1);
 
     // DESENHANDO A TORRE
-    glm::mat4 modelTower =  Matrix_Scale(0.4,0.4,0.4); //Diminuindo o tamanho da torre
-    glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(modelTower));
+    glm::mat4 towerModel =  Matrix_Scale(0.4,0.4,0.4); //Diminuindo o tamanho da torre
+    glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(towerModel));
     glUniform1i(object_id_uniform, TOWER);
     DrawVirtualObject("tower",TOWER);
 
@@ -599,24 +600,22 @@ void DrawObjectModels(){
     }
 
 
-
+    // DESENHANDO O ROBO
     float scale = 0.008;
-    //Nao utilizando a rotação da cabeça do robo nas comparações
-    glm::mat4 modelCompareRobot  = Matrix_Translate(chr_pos[0],chr_pos[1],chr_pos[2])*Matrix_Scale(scale,scale,scale); //Diminuindo o tamanho do robo
 
-    //Se ouver intersecção, com a torre, volta para a posição antiga
-    if(CompareAABB_AABB(ROBOTTOP,modelCompareRobot,TOWER,modelTower) && CompareAABB_AABB(ROBOTBOTTOM,modelCompareRobot,TOWER,modelTower)  ){
-        chr_pos = chr_pos_old;
+    //Testa se o robo pode se mover para essa nova posição
+    if(!CanRobotMove(scale, towerModel)){
+        chr_pos = chr_pos_old; //Se não, volta para sua posiçao anterior
     }
-    glm::mat4 modelRobot  = Matrix_Translate(chr_pos[0],chr_pos[1],chr_pos[2])
+
+    glm::mat4 robotModel  = Matrix_Translate(chr_pos[0],chr_pos[1],chr_pos[2])
                             *Matrix_Rotate_Y(chr_rotate_angle) //Rotação que move a cabeça do robo para onde a camera esta olhando
                            *Matrix_Scale(scale,scale,scale); //Diminuindo o tamanho do robo
-    glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(modelRobot));
+    glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(robotModel));
     glUniform1i(object_id_uniform, ROBOTTOP);
     DrawVirtualObject("robotTop",ROBOTTOP);
 
-
-    glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(modelRobot));
+    glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(robotModel));
     glUniform1i(object_id_uniform, ROBOTBOTTOM);
     DrawVirtualObject("robotBottom",ROBOTBOTTOM);
 
@@ -663,7 +662,16 @@ void DrawObjectModels(){
 
     initialize = false;
 }
+//Testando se o robo consegue se mover (se ocorre colisão)
+bool CanRobotMove(float scale, glm::mat4 towerModel){
+    //Nao utilizando a rotação da cabeça do robo nas comparações
+    glm::mat4 modelCompareRobot = Matrix_Translate(chr_pos[0],chr_pos[1],chr_pos[2])*Matrix_Scale(scale,scale,scale); //Diminuindo o tamanho do robo
 
+    //Teste de colisão do robo com a torre
+    bool towerCollision = (CompareAABB_AABB(ROBOTTOP,modelCompareRobot,TOWER,towerModel) && CompareAABB_AABB(ROBOTBOTTOM,modelCompareRobot,TOWER,towerModel));
+
+    return !(towerCollision || false);
+}
 glm::mat4 ComputeProjectionMatrix(){
     //COMPUTANDO MATRIZ DE PROJEÇÃO
     // Agora computamos a matriz de Projeção.
