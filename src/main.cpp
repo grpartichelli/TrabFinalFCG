@@ -123,7 +123,6 @@ void TextRendering_PrintMatrixVectorProductDivW(GLFWwindow* window, glm::mat4 M,
 // Funções abaixo renderizam como texto na janela OpenGL algumas matrizes e
 // outras informações do programa. Definidas após main().
 void TextRendering_ShowModelViewProjection(GLFWwindow* window, glm::mat4 projection, glm::mat4 view, glm::mat4 model, glm::vec4 p_model);
-void TextRendering_ShowEulerAngles(GLFWwindow* window);
 void TextRendering_ShowProjection(GLFWwindow* window);
 void TextRendering_ShowFramesPerSecond(GLFWwindow* window);
 
@@ -166,10 +165,7 @@ std::stack<glm::mat4>  g_MatrixStack;
 // Razão de proporção da janela (largura/altura). Veja função FramebufferSizeCallback().
 float g_ScreenRatio = 1.0f;
 
-// Ângulos de Euler que controlam a rotação de objetos na cena
-float g_AngleX = 0.0f;
-float g_AngleY = 0.0f;
-float g_AngleZ = 0.0f;
+
 
 // "g_LeftMouseButtonPressed = true" se o usuário está com o botão esquerdo do mouse
 // pressionado no momento atual. Veja função MouseButtonCallback().
@@ -228,8 +224,8 @@ bool jump_activated =false; //se o personagem está pulando
 bool can_jump = true;//se o robo está numa posição em que ele possa pular (em cima de uma plataforma/chão)
 int jump_strength = 24; //o quão forte é o pulo
 int current_jump_step = 0; //o pulo é divido em varias partes, isso ajuda a contar quantas partes já foram
-int jump_steps = 100; //quantidade de passos de um pulo
-float on_top_of_y = 0; //indica o chão mais próximo de onde o robo está ( a gravidade descerá até esse ponto)
+int jump_steps = 80; //quantidade de passos de um pulo
+float on_top_ofy = 0; //indica o chão mais próximo de onde o robo está ( a gravidade descerá até esse ponto)
 
 //////////////////////////////////////////////////////////////////////
 //DEFINIÇÕES DAS OUTRAS CAMERAS
@@ -245,7 +241,7 @@ float camera_speed =5;
 // VARIAVEIS PARA AS DIMENSÕES DA TELA
 int window_h;
 int window_w;
-int screentype = 0; // 0 é em janela, 1 é em janela com mouse livre, 2 é fullscreen
+int mousetype = 0; // 0 é mouse preso, 1 é mouse livre
 
 ////////////////////////////////////////////////////////////////////////////////////////////
 //VÁRIAVEIS UTILIZADAS PARA GARANTIR QUE ANIMAÇÕES SEJAM INDEPENDENTES DE TEMPO DE EXECUÇÃO
@@ -254,12 +250,12 @@ float t_dif,t_atual;
 
 ///////////////////////////////////////////////////
 //PARA CRIAÇÃO E MOVIMENTAÇÃO DE PLATAFORMAS(CUBOS)
-#define  NUM_PLATFORMS 14
+#define  NUM_PLATFORMS 18
 glm::mat4 random_cube_models[NUM_PLATFORMS];
 float initialize = true; //Flag para sabermos se é necessario inicializar (model carregado somente uma vez)
-float move_cubesX = 0.0f; //Movimenta-se os cubos em relação a X pressionando Q
-float move_cubesZ = 0.0f; //Movimenta-se os cubos em relação a Z pressionando E
-
+float move_cubeX[NUM_PLATFORMS]; //Movimenta-se os cubos em relação a X pressionando Q
+float move_cubeZ[NUM_PLATFORMS]; //Movimenta-se os cubos em relação a Z pressionando E
+int on_top_of_platform = -1; //Indica que o robo está em cima desse cubo, o que impede o movimento do mesmo
 ////////////////////////////////////////////////////
 //BBOX DE TODOS OBJETOS QUE UTILIZAM COMPARAÇÕES
 std::map<int,glm::vec4> mapBboxMax;
@@ -398,7 +394,7 @@ int main(int argc, char* argv[])
         DrawObjectModels();
         ///////////////////////////////////////////
         //Imprimindo informações na tela
-        TextRendering_ShowEulerAngles(window);
+
         TextRendering_ShowProjection(window);
         TextRendering_ShowFramesPerSecond(window);
         glfwSwapBuffers(window); //Troca de buffers permitindo a visualização dos objetos
@@ -652,7 +648,7 @@ void DrawObjectModels(){
                 translate_z = (rand()%8) - 4;
             }
 
-            random_cube_models[i] = Matrix_Translate(translate_x,i*0.75 + 1, translate_z)*random_cube_models[i]; //Deslocamento
+            random_cube_models[i] = Matrix_Translate(translate_x,i*0.5 + 1, translate_z)*random_cube_models[i]; //Deslocamento
         }
      }
 
@@ -660,7 +656,7 @@ void DrawObjectModels(){
     for(int i =0 ; i<NUM_PLATFORMS; i++){
 
         model = random_cube_models[i]; //Definida anteriormente, uma matriz com escalas e transalações aleatorias para cada plataforma
-        model = Matrix_Translate(move_cubesX,0,move_cubesZ)*model;
+        model = Matrix_Translate(move_cubeX[i],0,move_cubeZ[i])*model;
         glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(object_id_uniform, CUBE);
         DrawVirtualObject("cube",CUBE);
@@ -710,7 +706,7 @@ void DrawObjectModels(){
 //Testando se o robo consegue se mover (se ocorre colisão)
 bool CanRobotMove(float scale, glm::mat4 towerModel){
     on_top_of_y = 0; //sempre assumimindo que ele está no chão se ele não entrar em contato com nenhuma plataforma
-
+    on_top_of_platform=-1;//sempre assumindo que não estamos em cima de nenhuma plataforma
     float delta = 0.01;
     //Nao utilizando a rotação da cabeça do robo nas comparações
     glm::mat4 modelCompareRobot = Matrix_Translate(chr_pos[0],chr_pos[1],chr_pos[2])*Matrix_Scale(scale,scale,scale); //Diminuindo o tamanho do robo
@@ -721,7 +717,7 @@ bool CanRobotMove(float scale, glm::mat4 towerModel){
     glm::mat4 cubeModel;
     for(int i=0; i<NUM_PLATFORMS; i++){
 
-        cubeModel =  Matrix_Translate(move_cubesX,0,move_cubesZ)*random_cube_models[i];
+        cubeModel =  Matrix_Translate(move_cubeX[i],0,move_cubeZ[i])*random_cube_models[i];
 
         if(CompareAABB_AABB(ROBOTTOP,modelCompareRobot,CUBE,cubeModel) || CompareAABB_AABB(ROBOTBOTTOM,modelCompareRobot,CUBE,cubeModel)){
             glm::vec4 cubeBboxmax = cubeModel*mapBboxMax[CUBE];
@@ -731,10 +727,12 @@ bool CanRobotMove(float scale, glm::mat4 towerModel){
             float delta = 0.01;
             if(  (chr_pos[1] <=  cubeBboxmax[1]+delta) &&  (chr_pos[1] >=  cubeBboxmax[1]-delta)){
                 on_top_of_y = chr_pos[1];//avisa a gravidade para nao empurrar o robo para baixo
+                on_top_of_platform = i; //indica que essa plataforma nao poderá ser movida
                 can_jump = true;            //avisa que o robo pode pular
                 platformCollision = false; //permite o robo a se mover (pois ele está em cima da plataforma)
+
             }
-            break;
+
         }
 
     }
@@ -1410,46 +1408,30 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(window, GL_TRUE);
 
-    // O código abaixo implementa a seguinte lógica:
-    //   Se apertar tecla X       então g_AngleX += delta;
-    //   Se apertar tecla shift+X então g_AngleX -= delta;
-    //   Se apertar tecla Y       então g_AngleY += delta;
-    //   Se apertar tecla shift+Y então g_AngleY -= delta;
-    //   Se apertar tecla Z       então g_AngleZ += delta;
-    //   Se apertar tecla shift+Z então g_AngleZ -= delta;
-
-    float delta = 3.141592 / 16; // 22.5 graus, em radianos.
-
-    if (key == GLFW_KEY_X && action == GLFW_PRESS)
-    {
-        g_AngleX += (mod & GLFW_MOD_SHIFT) ? -delta : delta;
-    }
-
-    if (key == GLFW_KEY_Y && action == GLFW_PRESS)
-    {
-        g_AngleY += (mod & GLFW_MOD_SHIFT) ? -delta : delta;
-    }
-    if (key == GLFW_KEY_Z && action == GLFW_PRESS)
-    {
-        g_AngleZ += (mod & GLFW_MOD_SHIFT) ? -delta : delta;
-    }
-
+    ////////////////////////////////////////////////////////////////////
+    //MOVIMENTAÇÃO DAS PLATAFORMAS EIXO X E Z
     float cube_speed = 50;
-    //Movimentaçao dos cubos
     if (glfwGetKey(window,GLFW_KEY_Q) == GLFW_PRESS)
     {
-        move_cubesX += (mod & GLFW_MOD_SHIFT) ? -cube_speed*t_dif : cube_speed*t_dif;
+         for(int i =0; i<NUM_PLATFORMS; i++){
+            if(i != on_top_of_platform){ //Se o personagem está em cima do cubo, ele não se mexe
+                move_cubeX[i] += (mod & GLFW_MOD_SHIFT) ? -cube_speed*t_dif : cube_speed*t_dif;
+            }
+         }
     }
-
     if (glfwGetKey(window,GLFW_KEY_E) == GLFW_PRESS)
     {
-        move_cubesZ += (mod & GLFW_MOD_SHIFT) ? -cube_speed*t_dif : cube_speed*t_dif;
+
+         for(int i =0; i<NUM_PLATFORMS; i++){
+            if(i != on_top_of_platform){ //Se o personagem está em cima do cubo, ele não se mexe
+                move_cubeZ[i] += (mod & GLFW_MOD_SHIFT) ? -cube_speed*t_dif : cube_speed*t_dif;
+            }
+         }
     }
 
 
-
-
-
+    ////////////////////////////////////////////////////////////////////
+    // PROJEÇÕES
     // Se o usuário apertar a tecla P, utilizamos projeção perspectiva.
     if (key == GLFW_KEY_P && action == GLFW_PRESS)
     {
@@ -1462,6 +1444,8 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
         g_UsePerspectiveProjection = false;
     }
 
+    ///////////////////////////////////////////////////////
+    // CONTROLE DA TELA
     // Se o usuário apertar a tecla H, fazemos um "toggle" do texto informativo mostrado na tela.
     if (key == GLFW_KEY_H && action == GLFW_PRESS)
     {
@@ -1469,24 +1453,21 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
     }
 
     if (key == GLFW_KEY_F && action == GLFW_PRESS){
-        //Trocando entre fullscreen, janela e mouse livre
-        screentype++;
-        screentype = screentype%3;
-        switch(screentype){
-            case 0: //JANELA
-
-                glfwSetWindowMonitor(window,   NULL, 0, 0,  window_w*0.8, window_h*0.8, GLFW_DONT_CARE);
-                glfwSetWindowPos(window, 50, 50);
+        //Trocando entre mouse preso e mouse livre
+        mousetype++;
+        mousetype = mousetype%2;
+        switch(mousetype){
+            case 0: //MOUSE PRESO
+                glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
                 break;
             case 1: //MOUSE LIVRE
                  glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL); //MOSTRA O CURSOR
                  break;
-            case 2: //FULLSCREEN
-                 glfwSetWindowMonitor(window,  glfwGetPrimaryMonitor() , 0, 0, window_w/0.8, window_h/0.8, GLFW_DONT_CARE);
-                 glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED); //ESCONDE CURSOR
-                 break;
+
         }
     }
+    /////////////////////////////////////////////////
+    // CAMERA
     //Alterando o tipo de camêra de acordo com a tecla pressionada
     //Tecla 1: Camêra em primeira pessoa do personagem
     //Tecla 2: Camêra look at em volta do personagem
@@ -1583,20 +1564,7 @@ void TextRendering_ShowModelViewProjection(
     TextRendering_PrintMatrixVectorProductMoreDigits(window, viewport_mapping, p_ndc, -1.0f, 1.0f-26*pad, 1.0f);
 }
 
-// Escrevemos na tela os ângulos de Euler definidos nas variáveis globais
-// g_AngleX, g_AngleY, e g_AngleZ.
-void TextRendering_ShowEulerAngles(GLFWwindow* window)
-{
-    if ( !g_ShowInfoText )
-        return;
 
-    float pad = TextRendering_LineHeight(window);
-
-    char buffer[80];
-    snprintf(buffer, 80, "Euler Angles rotation matrix = Z(%.2f)*Y(%.2f)*X(%.2f)\n", g_AngleZ, g_AngleY, g_AngleX);
-
-    TextRendering_PrintString(window, buffer, -1.0f+pad/10, -1.0f+2*pad/10, 1.0f);
-}
 
 // Escrevemos na tela qual matriz de projeção está sendo utilizada.
 void TextRendering_ShowProjection(GLFWwindow* window)
