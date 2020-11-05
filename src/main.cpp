@@ -61,6 +61,10 @@
 #define LOOK_AT_CAMERA 2
 #define FREE_CAMERA 3
 
+//ESCALANDO .OBJS PARA TAMANHOS SENSATOS
+#define ROBOT_SCALE 0.008f
+#define TROPHY_SCALE 0.003f
+#define TOWER_SCALE 0.4f
 
 
 // Estrutura que representa um modelo geométrico carregado a partir de um
@@ -198,7 +202,7 @@ GLuint g_NumLoadedTextures = 0;
 //Nossas funções
 bool CompareAABB_AABB(int bbox_id1, glm::mat4 model1, int bbox_id2,glm::mat4 model2); //Compara duas bbox, retorna true caso intersecçao
 bool CanPlatformMove(int platform_id,  glm::mat4 towerModel); //Calcula se a plataforma pode andar (compara com torre e com robo)
-bool CanRobotMove(float scale, glm::mat4 towerModel); //Calcula se a intersecção do robo com algo caso ele se mova
+bool CanRobotMove(glm::mat4 towerModel); //Calcula se a intersecção do robo com algo caso ele se mova
 void LoadCharacterCamera(GLFWwindow* window); //Calcula os vetor view_vector e as posições do centro e lookat da camera do personagem
 void LoadLookAtCamera(glm::vec4 look_at_point); //Calcula os vetor view_vector e as posições do centro e lookat da camera lookat
 void LoadFreeCamera(GLFWwindow* window); //Calcula os vetor view_vector e as posições do centro e lookat da camera free
@@ -613,7 +617,7 @@ void DrawObjectModels(){
     //O .obj do troféu possui ele divido em várias partes
     //Diminuindo bastante o tamanho do troféu, seu .obj é grande
     //Translating ele para o topo da torre
-    model =  Matrix_Translate(0,9,0)*Matrix_Scale(0.003f,0.003f,0.003f);
+    model =  Matrix_Translate(0,9,0)*Matrix_Scale(TROPHY_SCALE,TROPHY_SCALE,TROPHY_SCALE);
     glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
     glUniform1i(object_id_uniform, TROPHY);
     DrawVirtualObject("trophy",TROPHY);
@@ -634,10 +638,39 @@ void DrawObjectModels(){
 
     ///////////////////////////////////////////////
     // DESENHANDO A TORRE
-    glm::mat4 towerModel =  Matrix_Scale(0.4,0.4,0.4); //Diminuindo o tamanho da torre
+    glm::mat4 towerModel =  Matrix_Scale(TOWER_SCALE,TOWER_SCALE,TOWER_SCALE); //Diminuindo o tamanho da torre
     glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(towerModel));
     glUniform1i(object_id_uniform, TOWER);
     DrawVirtualObject("tower",TOWER);
+
+
+
+
+     ////////////////////////////////////////////////////////////////////
+    //// DESENHANDO O ROBO
+    //A cabeça do robo nao deve se mexer em outras posições da camera
+    if(camera_type == CHARACTER_CAMERA){
+        chr_rotate_angle = g_CameraTheta -1.25;
+    }
+
+    float scale = 0.008;
+
+    //Testa se o robo pode se mover para essa nova posição
+    if(!CanRobotMove( towerModel)){
+        chr_pos = chr_pos_old; //Se não, volta para sua posiçao anterior
+    }
+
+    glm::mat4 robotModel  = Matrix_Translate(chr_pos[0],chr_pos[1],chr_pos[2])
+                            *Matrix_Rotate_Y(chr_rotate_angle) //Rotação que move a cabeça do robo para onde a camera esta olhando
+                           *Matrix_Scale(scale,scale,scale); //Diminuindo o tamanho do robo
+    glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(robotModel));
+    glUniform1i(object_id_uniform, ROBOTTOP);
+    DrawVirtualObject("robotTop",ROBOTTOP);
+
+    glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(robotModel));
+    glUniform1i(object_id_uniform, ROBOTBOTTOM);
+    DrawVirtualObject("robotBottom",ROBOTBOTTOM);
+
 
 
 
@@ -678,31 +711,6 @@ void DrawObjectModels(){
     }
 
 
-    ////////////////////////////////////////////////////////////////////
-    //// DESENHANDO O ROBO
-    //A cabeça do robo nao deve se mexer em outras posições da camera
-    if(camera_type == CHARACTER_CAMERA){
-        chr_rotate_angle = g_CameraTheta -1.25;
-    }
-
-    float scale = 0.008;
-
-    //Testa se o robo pode se mover para essa nova posição
-    if(!CanRobotMove(scale, towerModel)){
-        chr_pos = chr_pos_old; //Se não, volta para sua posiçao anterior
-    }
-
-    glm::mat4 robotModel  = Matrix_Translate(chr_pos[0],chr_pos[1],chr_pos[2])
-                            *Matrix_Rotate_Y(chr_rotate_angle) //Rotação que move a cabeça do robo para onde a camera esta olhando
-                           *Matrix_Scale(scale,scale,scale); //Diminuindo o tamanho do robo
-    glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(robotModel));
-    glUniform1i(object_id_uniform, ROBOTTOP);
-    DrawVirtualObject("robotTop",ROBOTTOP);
-
-    glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(robotModel));
-    glUniform1i(object_id_uniform, ROBOTBOTTOM);
-    DrawVirtualObject("robotBottom",ROBOTBOTTOM);
-
 
     //UTILIZANDO UMA ESFERA COMO METEORO
     model =  Matrix_Translate(0,10,10);
@@ -718,19 +726,23 @@ void DrawObjectModels(){
 bool CanPlatformMove(int platform_id,  glm::mat4 towerModel){
     //Calcula a matriz modelo do cubo
     glm::mat4 modelPlatform =  Matrix_Translate(move_cubeX[platform_id],0,move_cubeZ[platform_id])*random_cube_models[platform_id];
+    //Calculando matriz modelo do robo
+    glm::mat4 robotMode = Matrix_Translate(chr_pos[0],chr_pos[1],chr_pos[2])*Matrix_Scale(ROBOT_SCALE,ROBOT_SCALE,ROBOT_SCALE);
 
+    //Comparando as AABB do robo e da torre para evitar colisões
     bool towerCollision =CompareAABB_AABB(CUBE,modelPlatform,TOWER,towerModel);
+    bool robotCollision = (CompareAABB_AABB(ROBOTTOP,robotMode,CUBE,modelPlatform) || CompareAABB_AABB(ROBOTBOTTOM,robotMode,CUBE,modelPlatform));
 
-    return !(towerCollision || false);
+    return !(towerCollision || robotCollision);
 
 }
 //Testando se o robo consegue se mover (se ocorre colisão)
-bool CanRobotMove(float scale, glm::mat4 towerModel){
+bool CanRobotMove(glm::mat4 towerModel){
     on_top_of_y = 0; //sempre assumimindo que ele está no chão se ele não entrar em contato com nenhuma plataforma
     on_top_of_platform=-1;//sempre assumindo que não estamos em cima de nenhuma plataforma
     float delta = 0.01;
     //Nao utilizando a rotação da cabeça do robo nas comparações
-    glm::mat4 modelCompareRobot = Matrix_Translate(chr_pos[0],chr_pos[1],chr_pos[2])*Matrix_Scale(scale,scale,scale); //Diminuindo o tamanho do robo
+    glm::mat4 modelCompareRobot = Matrix_Translate(chr_pos[0],chr_pos[1],chr_pos[2])*Matrix_Scale(ROBOT_SCALE,ROBOT_SCALE,ROBOT_SCALE); //Diminuindo o tamanho do robo
 
     //////////////////////////////////////////////////////////////////
     //Testando se o robo irá ter intersecção com alguma plataforma
