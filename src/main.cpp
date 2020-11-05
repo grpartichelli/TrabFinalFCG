@@ -220,10 +220,18 @@ float chr_speed =12; //velocidade do robo
 float chr_rotate_angle; //angulo de rotação do robo(acompanhará a camera)
 float chr_cam_phi_min= 0.0625; //Controlando phi para a camera do personagem
 float chr_cam_phi_max =chr_cam_phi_min+1;
-float gravity =2; //gravidade irá empurrar o personagem para baixo a cada 2 iterações
+
+float gravity =5; //gravidade irá empurrar o personagem para baixo a cada 2 iterações
 bool gravity_iteration = false; //uma a cada duas iterações irá empurrar o personagem para baixo
 
+bool jump_activated =false; //se o personagem está pulando
+bool can_jump = true;//se o robo está numa posição em que ele possa pular (em cima de uma plataforma/chão)
+int jump_strength = 12; //o quão forte é o pulo
+int current_jump_step = 0; //o pulo é divido em varias partes, isso ajuda a contar quantas partes já foram
+int jump_steps = 200; //quantidade de passos de um pulo
 
+//////////////////////////////////////////////////////////////////////
+//DEFINIÇÕES DAS OUTRAS CAMERAS
 float g_CameraTheta = 0.0; // Ângulo no plano ZX em relação ao eixo Z
 float g_CameraPhi = 0.035f;   // Ângulo em relação ao eixo Y
 float g_CameraDistance = 4.5f; // Distância da câmera para camera_lookat_l (raio da esfera)
@@ -232,28 +240,29 @@ glm::vec4 camera_up_vector   = glm::vec4(0.0f,1.0f,0.0f,0.0f); // Vetor "up" fix
 float r,x,y,z;
 float camera_speed =5;
 
-//Obtendo a resolução da tela
+//////////////////////////////////////////////////////////////////////////////
+// VARIAVEIS PARA AS DIMENSÕES DA TELA
 int window_h;
 int window_w;
 int screentype = 0; // 0 é em janela, 1 é em janela com mouse livre, 2 é fullscreen
 
-//Váriaveis utilizadas para garantir que animações sejam idependetes de tempo de execução
+////////////////////////////////////////////////////////////////////////////////////////////
+//VÁRIAVEIS UTILIZADAS PARA GARANTIR QUE ANIMAÇÕES SEJAM INDEPENDENTES DE TEMPO DE EXECUÇÃO
 float t_prev = glfwGetTime();
 float t_dif,t_atual;
 
-
-
-//Para criação das plataformas(cubos)
+///////////////////////////////////////////////////
+//PARA CRIAÇÃO E MOVIMENTAÇÃO DE PLATAFORMAS(CUBOS)
 #define  NUM_PLATFORMS 14
 glm::mat4 random_cube_models[NUM_PLATFORMS];
 float initialize = true; //Flag para sabermos se é necessario inicializar (model carregado somente uma vez)
 float move_cubesX = 0.0f; //Movimenta-se os cubos em relação a X pressionando Q
 float move_cubesZ = 0.0f; //Movimenta-se os cubos em relação a Z pressionando E
 
-//bbox de cada objeto (antes de serem multiplicados por model)
+////////////////////////////////////////////////////
+//BBOX DE TODOS OBJETOS QUE UTILIZAM COMPARAÇÕES
 std::map<int,glm::vec4> mapBboxMax;
 std::map<int,glm::vec4> mapBboxMin;
-
 
 
 int main(int argc, char* argv[])
@@ -425,6 +434,7 @@ void LoadCharacterCamera(GLFWwindow* window){ //LoadCharacterCamera é uma mistu
 
         if(chr_pos[1] <= 0){ //Salvando custo computacional realizando a comparação com o plano do chão de forma simples
             chr_pos[1] = 0; //Evita que o robo atravesse o chão
+            can_jump = true;
         }
 
         gravity_iteration = false;
@@ -439,7 +449,7 @@ void LoadCharacterCamera(GLFWwindow* window){ //LoadCharacterCamera é uma mistu
 
         float y= chr_pos[1]; // O personagem não se mexe verticalmente pelo controlador
         chr_pos_old = chr_pos; //salva a posição atual caso o objeto nao possa se mover
-        //Moving using W,A,S,D
+        //Moving using W,A,S,D e SPACE
         // Movimentamos o personagem
         if (glfwGetKey(window,GLFW_KEY_W ) == GLFW_PRESS)
         {
@@ -457,7 +467,24 @@ void LoadCharacterCamera(GLFWwindow* window){ //LoadCharacterCamera é uma mistu
         {
             chr_pos += u*chr_speed*t_dif;
         }
-        chr_pos[1] = y;
+        if ( (glfwGetKey(window,GLFW_KEY_SPACE ) == GLFW_PRESS) && can_jump  ) //iniciar um pulo
+        {
+            jump_activated = true;
+            can_jump = false;
+        }
+
+        if(jump_activated){
+
+            current_jump_step++;    //aumenta o passo atual do pulo
+            chr_pos[1] = y + jump_strength*t_dif;
+            if(current_jump_step == jump_steps){ //testa se o pulo acabou, resetando variaveis
+                jump_activated = false;
+                current_jump_step = 0;
+            }
+        }
+        else{
+            chr_pos[1] = y;
+        }
 
         //Deslocado um pouco para cima para que o usuario tenha um campo de visão maior
         LoadLookAtCamera(Matrix_Translate(0,1.5,0)*chr_pos); //Faz o calculo do vetor de view com base no look at camera
@@ -676,6 +703,9 @@ void DrawObjectModels(){
 }
 //Testando se o robo consegue se mover (se ocorre colisão)
 bool CanRobotMove(float scale, glm::mat4 towerModel){
+
+
+
     //Nao utilizando a rotação da cabeça do robo nas comparações
     glm::mat4 modelCompareRobot = Matrix_Translate(chr_pos[0],chr_pos[1],chr_pos[2])*Matrix_Scale(scale,scale,scale); //Diminuindo o tamanho do robo
 
