@@ -197,6 +197,7 @@ GLuint g_NumLoadedTextures = 0;
 /////////////////////////////////////////////////////////////////////////////////////
 //Nossas funções
 bool CompareAABB_AABB(int bbox_id1, glm::mat4 model1, int bbox_id2,glm::mat4 model2); //Compara duas bbox, retorna true caso intersecçao
+bool CanPlatformMove(int platform_id,  glm::mat4 towerModel); //Calcula se a plataforma pode andar (compara com torre e com robo)
 bool CanRobotMove(float scale, glm::mat4 towerModel); //Calcula se a intersecção do robo com algo caso ele se mova
 void LoadCharacterCamera(GLFWwindow* window); //Calcula os vetor view_vector e as posições do centro e lookat da camera do personagem
 void LoadLookAtCamera(glm::vec4 look_at_point); //Calcula os vetor view_vector e as posições do centro e lookat da camera lookat
@@ -225,7 +226,7 @@ bool can_jump = true;//se o robo está numa posição em que ele possa pular (em
 int jump_strength = 24; //o quão forte é o pulo
 int current_jump_step = 0; //o pulo é divido em varias partes, isso ajuda a contar quantas partes já foram
 int jump_steps = 80; //quantidade de passos de um pulo
-float on_top_ofy = 0; //indica o chão mais próximo de onde o robo está ( a gravidade descerá até esse ponto)
+float on_top_of_y = 0; //indica o chão mais próximo de onde o robo está ( a gravidade descerá até esse ponto)
 
 //////////////////////////////////////////////////////////////////////
 //DEFINIÇÕES DAS OUTRAS CAMERAS
@@ -255,6 +256,8 @@ glm::mat4 random_cube_models[NUM_PLATFORMS];
 float initialize = true; //Flag para sabermos se é necessario inicializar (model carregado somente uma vez)
 float move_cubeX[NUM_PLATFORMS]; //Movimenta-se os cubos em relação a X pressionando Q
 float move_cubeZ[NUM_PLATFORMS]; //Movimenta-se os cubos em relação a Z pressionando E
+float move_cubeXOld[NUM_PLATFORMS]; //Posição do cubo uma iteração atras
+float move_cubeZOld[NUM_PLATFORMS]; //Posiçao do cubo uma iteração atras
 int on_top_of_platform = -1; //Indica que o robo está em cima desse cubo, o que impede o movimento do mesmo
 ////////////////////////////////////////////////////
 //BBOX DE TODOS OBJETOS QUE UTILIZAM COMPARAÇÕES
@@ -295,7 +298,7 @@ int main(int argc, char* argv[])
     GLFWwindow* window;
     window = glfwCreateWindow(window_w*0.8, window_h*0.8, "Mr Robot Reaches the Top", NULL, NULL);
 
-    glfwSetWindowPos(window, 500, 50);
+    glfwSetWindowPos(window, 50, 50);
 
 
 
@@ -353,6 +356,13 @@ int main(int argc, char* argv[])
     glm::mat4 the_model;
     glm::mat4 the_view;
 
+    //inicializando cubos
+    for(int i=0; i< NUM_PLATFORMS; i++){
+        move_cubeZ[i] = 0;
+        move_cubeX[i] = 0;
+        move_cubeZOld[i] = 0;
+        move_cubeXOld[i] = 0;
+    }
 
 
     // Ficamos em loop, renderizando, até que o usuário feche a janela
@@ -615,13 +625,14 @@ void DrawObjectModels(){
     glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
     glUniform1i(object_id_uniform, TROPHY);
     DrawVirtualObject("trophyhandle",-1);
-
+    /////////////////////////////////////////////////
     // DESENHANDO O CHÃO
     model = Matrix_Identity();
     glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
     glUniform1i(object_id_uniform, FLOOR);
     DrawVirtualObject("floor",-1);
 
+    ///////////////////////////////////////////////
     // DESENHANDO A TORRE
     glm::mat4 towerModel =  Matrix_Scale(0.4,0.4,0.4); //Diminuindo o tamanho da torre
     glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(towerModel));
@@ -630,49 +641,50 @@ void DrawObjectModels(){
 
 
 
-
-    //UTILIZANDO CUBOS PARA GERAR AS PLATAFORMAS
-
+    ///////////////////////////////////////////////////
+    //DESENHANDO CUBOS (PLATAFORMAS)
     //só é necessario calcular uma unica vez as random_cube_model
-
-    if(initialize){
+    //
+    if(initialize){//Gerando a matriz modelo de forma aleatoria
         for(int i =0 ; i<NUM_PLATFORMS; i++){
             random_cube_models[i] = Matrix_Scale((rand()%100)/200+0.75,((rand()%100)/250)+0.2,(rand()%100)/200+0.75); //Achatamento aleatorio
             float translate_x = (rand()%10) - 5;
             float translate_z = (rand()%10) - 5;
-            //gerando plataformas que não estao dentro da torre ( entre -1 e 1)
-            while(translate_x <= 1 && translate_x >= -1){
-                translate_x = (rand()%8) - 4;
+            //gerando plataformas que não estao dentro da torre ( entre -2 e 2)
+            while(translate_x <= 2 && translate_x >= -2){
+                translate_x = (rand()%10) - 5;
             }
-             while(translate_z <= 1 && translate_z >= -1){
-                translate_z = (rand()%8) - 4;
+             while(translate_z <= 2 && translate_z >= -2){
+                translate_z = (rand()%10) - 5;
             }
 
             random_cube_models[i] = Matrix_Translate(translate_x,i*0.5 + 1, translate_z)*random_cube_models[i]; //Deslocamento
         }
      }
 
-
+     //Transladando os cubos para sua posição controlada pelo usario
     for(int i =0 ; i<NUM_PLATFORMS; i++){
 
         model = random_cube_models[i]; //Definida anteriormente, uma matriz com escalas e transalações aleatorias para cada plataforma
-        model = Matrix_Translate(move_cubeX[i],0,move_cubeZ[i])*model;
+
+        if(!CanPlatformMove(i,towerModel)){   //Se a plataforma nao pode se mover, mantém ela na posição antiga
+            move_cubeX[i] = move_cubeXOld[i];
+            move_cubeZ[i] = move_cubeZOld[i];
+        }
+         model = Matrix_Translate(move_cubeX[i],0,move_cubeZ[i])*model;
         glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(object_id_uniform, CUBE);
         DrawVirtualObject("cube",CUBE);
-
-
     }
 
 
-
+    ////////////////////////////////////////////////////////////////////
+    //// DESENHANDO O ROBO
     //A cabeça do robo nao deve se mexer em outras posições da camera
     if(camera_type == CHARACTER_CAMERA){
         chr_rotate_angle = g_CameraTheta -1.25;
     }
 
-
-    // DESENHANDO O ROBO
     float scale = 0.008;
 
     //Testa se o robo pode se mover para essa nova posição
@@ -692,7 +704,7 @@ void DrawObjectModels(){
     DrawVirtualObject("robotBottom",ROBOTBOTTOM);
 
 
-    //UTILIZANDO ESFERAS PARA OS "METEOROS"
+    //UTILIZANDO UMA ESFERA COMO METEORO
     model =  Matrix_Translate(0,10,10);
     glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
     glUniform1i(object_id_uniform, SPHERE);
@@ -702,6 +714,15 @@ void DrawObjectModels(){
 
 
     initialize = false;
+}
+bool CanPlatformMove(int platform_id,  glm::mat4 towerModel){
+    //Calcula a matriz modelo do cubo
+    glm::mat4 modelPlatform =  Matrix_Translate(move_cubeX[platform_id],0,move_cubeZ[platform_id])*random_cube_models[platform_id];
+
+    bool towerCollision =CompareAABB_AABB(CUBE,modelPlatform,TOWER,towerModel);
+
+    return !(towerCollision || false);
+
 }
 //Testando se o robo consegue se mover (se ocorre colisão)
 bool CanRobotMove(float scale, glm::mat4 towerModel){
@@ -1414,15 +1435,20 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
     if (glfwGetKey(window,GLFW_KEY_Q) == GLFW_PRESS)
     {
          for(int i =0; i<NUM_PLATFORMS; i++){
+            move_cubeXOld[i] = move_cubeX[i]; //Salva a posição caso o cubo nao possa se mover
+
             if(i != on_top_of_platform){ //Se o personagem está em cima do cubo, ele não se mexe
                 move_cubeX[i] += (mod & GLFW_MOD_SHIFT) ? -cube_speed*t_dif : cube_speed*t_dif;
+
             }
          }
     }
     if (glfwGetKey(window,GLFW_KEY_E) == GLFW_PRESS)
     {
-
          for(int i =0; i<NUM_PLATFORMS; i++){
+
+            move_cubeZOld[i] = move_cubeZ[i]; //Salva a posição caso o cubo nao possa se mover
+
             if(i != on_top_of_platform){ //Se o personagem está em cima do cubo, ele não se mexe
                 move_cubeZ[i] += (mod & GLFW_MOD_SHIFT) ? -cube_speed*t_dif : cube_speed*t_dif;
             }
