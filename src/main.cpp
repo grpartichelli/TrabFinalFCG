@@ -216,11 +216,12 @@ glm::vec4 chr_pos = glm::vec4(0.0f,0.0f,15.0f,1.0f);     //Posição atual do pe
 glm::vec4 chr_pos_old = glm::vec4(0.0f,0.0f,15.0f,1.0f); //Posição do personagem uma iteração atras
 
 int camera_type = CHARACTER_CAMERA;
-float chr_speed =6; //velocidade do robo
+float chr_speed =12; //velocidade do robo
 float chr_rotate_angle; //angulo de rotação do robo(acompanhará a camera)
 float chr_cam_phi_min= 0.0625; //Controlando phi para a camera do personagem
 float chr_cam_phi_max =chr_cam_phi_min+1;
-
+float gravity =2; //gravidade irá empurrar o personagem para baixo a cada 2 iterações
+bool gravity_iteration = false; //uma a cada duas iterações irá empurrar o personagem para baixo
 
 
 float g_CameraTheta = 0.0; // Ângulo no plano ZX em relação ao eixo Z
@@ -252,6 +253,7 @@ float move_cubesZ = 0.0f; //Movimenta-se os cubos em relação a Z pressionando 
 //bbox de cada objeto (antes de serem multiplicados por model)
 std::map<int,glm::vec4> mapBboxMax;
 std::map<int,glm::vec4> mapBboxMin;
+
 
 
 int main(int argc, char* argv[])
@@ -417,50 +419,60 @@ bool CompareAABB_AABB(int bbox_id1, glm::mat4 model1, int bbox_id2,glm::mat4 mod
 
 
 void LoadCharacterCamera(GLFWwindow* window){ //LoadCharacterCamera é uma mistura de free camera com uma lookat posicionada no personagem(um pouco deslocada)
+    //Uma a cada duas iterações irão simplesmente empurrar o personagem para baixo, simulando gravidade
+    if(gravity_iteration){
+        chr_pos[1] -= t_dif*gravity; //Movendo o personagem verticalmente para baixo
 
-    //Calculando W e U para realizar as  na posição do personagem
-    glm::vec4 w = -camera_view_vector/norm(camera_view_vector) /* cálculo do vetor w */;
-    glm::vec4 u = crossproduct(camera_up_vector,w)/norm(crossproduct(camera_up_vector,w)) ;/* cálculo do vetor u */;
+        if(chr_pos[1] <= 0){ //Salvando custo computacional realizando a comparação com o plano do chão de forma simples
+            chr_pos[1] = 0; //Evita que o robo atravesse o chão
+        }
 
-    // Normalizamos os vetores u e w
-    w = w / norm(w);
-    u = u / norm(u);
+        gravity_iteration = false;
+    }else{
+        //Calculando W e U para realizar as  na posição do personagem
+        glm::vec4 w = -camera_view_vector/norm(camera_view_vector) /* cálculo do vetor w */;
+        glm::vec4 u = crossproduct(camera_up_vector,w)/norm(crossproduct(camera_up_vector,w)) ;/* cálculo do vetor u */;
 
-    float y= chr_pos[1];
-    chr_pos_old = chr_pos; //salva a posição atual caso o objeto nao possa se mover
-    //Moving using W,A,S,D
-    // Movimentamos o personagem
-    if (glfwGetKey(window,GLFW_KEY_W ) == GLFW_PRESS)
-    {
-        chr_pos-= w*camera_speed*t_dif;
+        // Normalizamos os vetores u e w
+        w = w / norm(w);
+        u = u / norm(u);
+
+        float y= chr_pos[1]; // O personagem não se mexe verticalmente pelo controlador
+        chr_pos_old = chr_pos; //salva a posição atual caso o objeto nao possa se mover
+        //Moving using W,A,S,D
+        // Movimentamos o personagem
+        if (glfwGetKey(window,GLFW_KEY_W ) == GLFW_PRESS)
+        {
+            chr_pos-= w*chr_speed*t_dif;
+        }
+         if (glfwGetKey(window,GLFW_KEY_A ) == GLFW_PRESS)
+        {
+            chr_pos -= u*chr_speed*t_dif;
+        }
+        if (glfwGetKey(window,GLFW_KEY_S ) == GLFW_PRESS)
+        {
+             chr_pos += w*chr_speed*t_dif;
+        }
+        if (glfwGetKey(window,GLFW_KEY_D ) == GLFW_PRESS)
+        {
+            chr_pos += u*chr_speed*t_dif;
+        }
+        chr_pos[1] = y;
+
+        //Deslocado um pouco para cima para que o usuario tenha um campo de visão maior
+        LoadLookAtCamera(Matrix_Translate(0,1.5,0)*chr_pos); //Faz o calculo do vetor de view com base no look at camera
+
+
+
+        //O movimento da camera do robo para cima e para baixo é limitado
+        if(g_CameraPhi > chr_cam_phi_max){
+            g_CameraPhi = chr_cam_phi_max;
+        }
+        if(g_CameraPhi < chr_cam_phi_min){
+            g_CameraPhi = chr_cam_phi_min;
+        }
+         gravity_iteration = true;
     }
-     if (glfwGetKey(window,GLFW_KEY_A ) == GLFW_PRESS)
-    {
-        chr_pos -= u*camera_speed*t_dif;
-    }
-    if (glfwGetKey(window,GLFW_KEY_S ) == GLFW_PRESS)
-    {
-         chr_pos += w*camera_speed*t_dif;
-    }
-    if (glfwGetKey(window,GLFW_KEY_D ) == GLFW_PRESS)
-    {
-        chr_pos += u*camera_speed*t_dif;
-    }
-    chr_pos[1] = y;
-
-    //Deslocado um pouco para cima para que o usuario tenha um campo de visão maior
-    LoadLookAtCamera(Matrix_Translate(0,1.5,0)*chr_pos); //Faz o calculo do vetor de view com base no look at camera
-
-
-
-    //O movimento da camera do robo para cima e para baixo é limitado
-    if(g_CameraPhi > chr_cam_phi_max){
-        g_CameraPhi = chr_cam_phi_max;
-    }
-    if(g_CameraPhi < chr_cam_phi_min){
-        g_CameraPhi = chr_cam_phi_min;
-    }
-
 }
 
 
