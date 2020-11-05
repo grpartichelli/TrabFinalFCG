@@ -65,7 +65,7 @@
 #define ROBOT_SCALE 0.008f
 #define TROPHY_SCALE 0.003f
 #define TOWER_SCALE 0.4f
-#define SPHERE_SCALE 0.5f
+#define SPHERE_SCALE 0.4f
 
 
 // Estrutura que representa um modelo geométrico carregado a partir de um
@@ -201,7 +201,7 @@ GLuint g_NumLoadedTextures = 0;
 //////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////
 //Nossas funções
-void BezierMeteorMove(); // Move o meteoro de acordo com o tempo e uma curva de bézier de grau 3
+void BezierMeteorMove(float t); // Move o meteoro de acordo com o tempo e uma curva de bézier de grau 3
 bool CompareAABB_AABB(int bbox_id1, glm::mat4 model1, int bbox_id2,glm::mat4 model2); //Compara duas bbox, retorna true caso intersecçao
 bool CanPlatformMove(int platform_id,  glm::mat4 towerModel); //Calcula se a plataforma pode andar (compara com torre e com robo)
 bool CanRobotMove(glm::mat4 towerModel); //Calcula se a intersecção do robo com algo caso ele se mova
@@ -257,7 +257,7 @@ float t_dif,t_atual;
 
 ///////////////////////////////////////////////////
 //PARA CRIAÇÃO E MOVIMENTAÇÃO DE PLATAFORMAS(CUBOS)
-#define  NUM_PLATFORMS 18
+#define  NUM_PLATFORMS 20
 glm::mat4 random_cube_models[NUM_PLATFORMS];
 float initialize = true; //Flag para sabermos se é necessario inicializar (model carregado somente uma vez)
 float move_cubeX[NUM_PLATFORMS]; //Movimenta-se os cubos em relação a X pressionando Q
@@ -267,8 +267,9 @@ float move_cubeZOld[NUM_PLATFORMS]; //Posiçao do cubo uma iteração atras
 int on_top_of_platform = -1; //Indica que o robo está em cima desse cubo, o que impede o movimento do mesmo
 ///////////////////////////////////////////////////////
 //ESFERA/METEORO
+#define CURVE_TIME 15 //tempo que demora para a curva toda ser feita
 glm::vec4 sphere_pos= glm::vec4(0.0f,15.0f,0.0f,1.0f);
-
+float bzier_t = 0;
 
 
 ////////////////////////////////////////////////////
@@ -376,7 +377,7 @@ int main(int argc, char* argv[])
         move_cubeXOld[i] = 0;
     }
 
-
+    srand(2); //Essa seed é boa pois cria um jogo nao muito dificil, pode trocar o valor para obter partidas diferentes
     // Ficamos em loop, renderizando, até que o usuário feche a janela
     while (!glfwWindowShouldClose(window))
     {
@@ -392,9 +393,15 @@ int main(int argc, char* argv[])
         t_dif = t_atual - t_prev;
         t_prev = t_atual;
 
+        //Calculando o valor t para curva de bzier
+        bzier_t+= t_dif;
+        //resetando a cada CURVE_TIME
+        if(bzier_t >= CURVE_TIME){
+            bzier_t =0;
+        }
 
         //Mover o meteoro numa curva de bézier
-        BezierMeteorMove();
+        BezierMeteorMove(bzier_t/CURVE_TIME);
 
 
         //TIPO DE CAMERA UTILIZADA
@@ -436,13 +443,26 @@ int main(int argc, char* argv[])
     return 0;
 }
 //Movendo o meteoro numa curva de bézier de grau 3
-void BezierMeteorMove(){
+void BezierMeteorMove(float t){ //t é calculado com base no tempo e vai de 0 até 1
+    float b03,b13,b23,b33;
+
+    //Definindo os ponto p1,p2,p3,p4 (uma curva que começa em cima da torre a desce girando)
+    glm::vec4 p1,p2,p3,p4;
+    float curve_radius = 9;
+    p1 = glm::vec4(-curve_radius,15,-curve_radius,1.0f); //em cima da torre (posiçao inicial da esfera)
+    p2 = glm::vec4(curve_radius,12.5,-curve_radius,1.0f);
+    p3 = glm::vec4(curve_radius,11,curve_radius,1.0f);
+    p4 = glm::vec4(-curve_radius/2,0,0,1.0f);
 
 
-    //Resetando a esfera quando chegar no chão
-    if(sphere_pos[1] == 0){
-        glm::vec4(0.0f,15.0f,0.0f,1.0f);
-    }
+    //Usando bézier polinomials para calcular nossa curva (slide 81 da aula 16)
+    b03 = (1-t)*(1-t)*(1-t);
+    b13 = 3*t*(1-t)*(1-t);
+    b23 = 3*t*t*(1-t);
+    b33 = t*t*t;
+
+    sphere_pos = p1*b03 + p2*b13 + p3*b23 + p4*b33;
+
 }
 
 //Compara duas bounding boxes, retorna true caso se intersecção
@@ -737,7 +757,8 @@ void DrawObjectModels(){
 
 
     //UTILIZANDO UMA ESFERA COMO METEORO
-    model =  Matrix_Translate(sphere_pos[0],sphere_pos[1],sphere_pos[2])*Matrix_Scale(SPHERE_SCALE,SPHERE_SCALE,SPHERE_SCALE);
+    //Translada ela de acordo com a curva de bezier, rotaciona ela utilizando o t de bzier para dar um efeito de giro
+    model =  Matrix_Translate(sphere_pos[0],sphere_pos[1],sphere_pos[2])*Matrix_Rotate_Y(bzier_t)*Matrix_Rotate_X(bzier_t)*Matrix_Scale(SPHERE_SCALE,SPHERE_SCALE,SPHERE_SCALE);
     glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
     glUniform1i(object_id_uniform, SPHERE);
     DrawVirtualObject("sphere",-1 ); //bbox id da sphere é zero pois utilizamos comparação com esfera
