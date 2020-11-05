@@ -226,9 +226,10 @@ bool gravity_iteration = false; //uma a cada duas iterações irá empurrar o pe
 
 bool jump_activated =false; //se o personagem está pulando
 bool can_jump = true;//se o robo está numa posição em que ele possa pular (em cima de uma plataforma/chão)
-int jump_strength = 12; //o quão forte é o pulo
+int jump_strength = 24; //o quão forte é o pulo
 int current_jump_step = 0; //o pulo é divido em varias partes, isso ajuda a contar quantas partes já foram
-int jump_steps = 200; //quantidade de passos de um pulo
+int jump_steps = 100; //quantidade de passos de um pulo
+float on_top_of_y = 0; //indica o chão mais próximo de onde o robo está ( a gravidade descerá até esse ponto)
 
 //////////////////////////////////////////////////////////////////////
 //DEFINIÇÕES DAS OUTRAS CAMERAS
@@ -432,8 +433,8 @@ void LoadCharacterCamera(GLFWwindow* window){ //LoadCharacterCamera é uma mistu
     if(gravity_iteration){
         chr_pos[1] -= t_dif*gravity; //Movendo o personagem verticalmente para baixo
 
-        if(chr_pos[1] <= 0){ //Salvando custo computacional realizando a comparação com o plano do chão de forma simples
-            chr_pos[1] = 0; //Evita que o robo atravesse o chão
+        if(chr_pos[1] <= on_top_of_y){ //Impede que o robo atravesse o chão/plataforma que está embaixo dele
+            chr_pos[1] = on_top_of_y;
             can_jump = true;
         }
 
@@ -606,7 +607,7 @@ void DrawObjectModels(){
     //O .obj do troféu possui ele divido em várias partes
     //Diminuindo bastante o tamanho do troféu, seu .obj é grande
     //Translating ele para o topo da torre
-    model =  Matrix_Translate(0,9,0)*Matrix_Scale(0.002f,0.002f,0.002f);
+    model =  Matrix_Translate(0,9,0)*Matrix_Scale(0.003f,0.003f,0.003f);
     glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
     glUniform1i(object_id_uniform, TROPHY);
     DrawVirtualObject("trophy",TROPHY);
@@ -630,6 +631,42 @@ void DrawObjectModels(){
     glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(towerModel));
     glUniform1i(object_id_uniform, TOWER);
     DrawVirtualObject("tower",TOWER);
+
+
+
+
+    //UTILIZANDO CUBOS PARA GERAR AS PLATAFORMAS
+
+    //só é necessario calcular uma unica vez as random_cube_model
+
+    if(initialize){
+        for(int i =0 ; i<NUM_PLATFORMS; i++){
+            random_cube_models[i] = Matrix_Scale((rand()%100)/200+0.75,((rand()%100)/250)+0.2,(rand()%100)/200+0.75); //Achatamento aleatorio
+            float translate_x = (rand()%10) - 5;
+            float translate_z = (rand()%10) - 5;
+            //gerando plataformas que não estao dentro da torre ( entre -1 e 1)
+            while(translate_x <= 1 && translate_x >= -1){
+                translate_x = (rand()%8) - 4;
+            }
+             while(translate_z <= 1 && translate_z >= -1){
+                translate_z = (rand()%8) - 4;
+            }
+
+            random_cube_models[i] = Matrix_Translate(translate_x,i*0.75 + 1, translate_z)*random_cube_models[i]; //Deslocamento
+        }
+     }
+
+
+    for(int i =0 ; i<NUM_PLATFORMS; i++){
+
+        model = random_cube_models[i]; //Definida anteriormente, uma matriz com escalas e transalações aleatorias para cada plataforma
+        model = Matrix_Translate(move_cubesX,0,move_cubesZ)*model;
+        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+        glUniform1i(object_id_uniform, CUBE);
+        DrawVirtualObject("cube",CUBE);
+
+
+    }
 
 
 
@@ -666,53 +703,58 @@ void DrawObjectModels(){
     DrawVirtualObject("sphere",-1 ); //bbox id da sphere é zero pois utilizamos comparação com esfera
 
 
-    //UTILIZANDO CUBOS PARA GERAR AS PLATAFORMAS
 
-    //só é necessario calcular uma unica vez as random_cube_model
-
-    if(initialize){
-        for(int i =0 ; i<NUM_PLATFORMS; i++){
-            random_cube_models[i] = Matrix_Scale((rand()%100)/200+0.75,((rand()%100)/250)+0.2,(rand()%100)/200+0.75); //Achatamento aleatorio
-            float translate_x = (rand()%10) - 5;
-            float translate_z = (rand()%10) - 5;
-            //gerando plataformas que não estao dentro da torre ( entre -1 e 1)
-            while(translate_x <= 1 && translate_x >= -1){
-                translate_x = (rand()%8) - 4;
-            }
-             while(translate_z <= 1 && translate_z >= -1){
-                translate_z = (rand()%8) - 4;
-            }
-
-            random_cube_models[i] = Matrix_Translate(translate_x,i*0.75 + 1, translate_z)*random_cube_models[i]; //Deslocamento
-        }
-     }
-
-
-    for(int i =0 ; i<NUM_PLATFORMS; i++){
-
-        model = random_cube_models[i]; //Definida anteriormente, uma matriz com escalas e transalações aleatorias para cada plataforma
-        model = Matrix_Translate(move_cubesX,0,move_cubesZ)*model;
-        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(object_id_uniform, CUBE);
-        DrawVirtualObject("cube",CUBE+i);
-
-
-    }
 
     initialize = false;
 }
 //Testando se o robo consegue se mover (se ocorre colisão)
 bool CanRobotMove(float scale, glm::mat4 towerModel){
+    on_top_of_y = 0; //sempre assumimindo que ele está no chão se ele não entrar em contato com nenhuma plataforma
 
-
-
+    float delta = 0.01;
     //Nao utilizando a rotação da cabeça do robo nas comparações
     glm::mat4 modelCompareRobot = Matrix_Translate(chr_pos[0],chr_pos[1],chr_pos[2])*Matrix_Scale(scale,scale,scale); //Diminuindo o tamanho do robo
 
-    //Teste de colisão do robo com a torre
-    bool towerCollision = (CompareAABB_AABB(ROBOTTOP,modelCompareRobot,TOWER,towerModel) && CompareAABB_AABB(ROBOTBOTTOM,modelCompareRobot,TOWER,towerModel));
+    //////////////////////////////////////////////////////////////////
+    //Testando se o robo irá ter intersecção com alguma plataforma
+    bool platformCollision = false;
+    glm::mat4 cubeModel;
+    for(int i=0; i<NUM_PLATFORMS; i++){
 
-    return !(towerCollision || false);
+        cubeModel =  Matrix_Translate(move_cubesX,0,move_cubesZ)*random_cube_models[i];
+
+        if(CompareAABB_AABB(ROBOTTOP,modelCompareRobot,CUBE,cubeModel) || CompareAABB_AABB(ROBOTBOTTOM,modelCompareRobot,CUBE,cubeModel)){
+            glm::vec4 cubeBboxmax = cubeModel*mapBboxMax[CUBE];
+            platformCollision = true;
+
+            //Isso significa que o personagem está em cima da plataforma (testa as alturas y do robo e da plataforma com um pequeno intervalo (delta))
+            float delta = 0.01;
+            if(  (chr_pos[1] <=  cubeBboxmax[1]+delta) &&  (chr_pos[1] >=  cubeBboxmax[1]-delta)){
+                on_top_of_y = chr_pos[1];//avisa a gravidade para nao empurrar o robo para baixo
+                can_jump = true;            //avisa que o robo pode pular
+                platformCollision = false; //permite o robo a se mover (pois ele está em cima da plataforma)
+            }
+            break;
+        }
+
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////
+    //Testando se o robo irá ter intersecção com a torre
+    bool towerCollision = (CompareAABB_AABB(ROBOTTOP,modelCompareRobot,TOWER,towerModel) || CompareAABB_AABB(ROBOTBOTTOM,modelCompareRobot,TOWER,towerModel));
+
+    //Testando se o robo está em cima da torre
+    glm::vec4 towerBboxmax= towerModel*mapBboxMax[TOWER];
+    //Isso significa que o personagem está em cima da torre (testa as alturas y do robo e da plataforma com um pequeno intervalo(delta))
+    if( towerCollision && (chr_pos[1] <=  towerBboxmax[1]+delta) &&  (chr_pos[1] >=  towerBboxmax[1]-delta)){
+        on_top_of_y = chr_pos[1]; //avisa a gravidade para nao empurrar o robo para baixo
+        can_jump = true;           //avisa que o robo pode pular
+        towerCollision = false; //permite o robo a se mover (pois ele está em cima da torre)
+    }
+
+
+
+    return !(towerCollision || platformCollision);
 }
 glm::mat4 ComputeProjectionMatrix(){
     //COMPUTANDO MATRIZ DE PROJEÇÃO
