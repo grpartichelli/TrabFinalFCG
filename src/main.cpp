@@ -69,6 +69,7 @@
 
 #define SPHERE_RADIUS 2.54558420181f //raio da esfera no .obj
 
+#define WINDOW_SCALE 0.8
 
 // Estrutura que representa um modelo geométrico carregado a partir de um
 // arquivo ".obj". Veja https://en.wikipedia.org/wiki/Wavefront_.obj_file .
@@ -241,9 +242,9 @@ bool gravity_iteration = false; //uma a cada duas iterações irá empurrar o pe
 
 bool jump_activated =false; //se o personagem está pulando
 bool can_jump = true;//se o robo está numa posição em que ele possa pular (em cima de uma plataforma/chão)
-int jump_strength = 24; //o quão forte é o pulo
-int current_jump_step = 0; //o pulo é divido em varias partes, isso ajuda a contar quantas partes já foram
-int jump_steps = 80; //quantidade de passos de um pulo
+int jump_strength = 20; //o quão forte é o pulo
+int jump_initial_height=0; //altura inicial ao pular
+int jump_height = 2; //quantidade de passos de um pulo
 float on_top_of_y = 0; //indica o chão mais próximo de onde o robo está ( a gravidade descerá até esse ponto)
 
 //////////////////////////////////////////////////////////////////////
@@ -321,7 +322,7 @@ int main(int argc, char* argv[])
     window_h = mode->height;
 
     GLFWwindow* window;
-    window = glfwCreateWindow(window_w*0.8, window_h*0.8, "Mr Robot Reaches the Top", NULL, NULL);
+    window = glfwCreateWindow(window_w*WINDOW_SCALE, window_h*WINDOW_SCALE, "Mr Robot Reaches the Top",NULL, NULL);
 
     glfwSetWindowPos(window, 250, 50);
 
@@ -357,7 +358,7 @@ int main(int argc, char* argv[])
     // Definimos a função de callback que será chamada sempre que a janela for
     // redimensionada, por consequência alterando o tamanho do "framebuffer"
     glfwSetFramebufferSizeCallback(window, FramebufferSizeCallback);
-    FramebufferSizeCallback(window,window_w*0.8,window_h*0.8); // Forçamos a chamada do callback acima, para definir g_ScreenRatio.
+    FramebufferSizeCallback(window,window_w*WINDOW_SCALE,window_h*WINDOW_SCALE); // Forçamos a chamada do callback acima, para definir g_ScreenRatio.
 
 
 
@@ -676,15 +677,17 @@ void LoadCharacterCamera(GLFWwindow* window){ //LoadCharacterCamera é uma mistu
         {
             jump_activated = true;
             can_jump = false;
+            jump_initial_height = chr_pos[1];
         }
 
         if(jump_activated){
 
-            current_jump_step++;    //aumenta o passo atual do pulo
+
             chr_pos[1] = y + jump_strength*t_dif;
-            if(current_jump_step == jump_steps){ //testa se o pulo acabou, resetando variaveis
+
+            if((chr_pos[1]-jump_initial_height) >= jump_height){ //testa se o pulo acabou, resetando variaveis
                 jump_activated = false;
-                current_jump_step = 0;
+
             }
         }
         else{
@@ -851,6 +854,7 @@ void DrawObjectModels(){
 
     //Testa se o robo pode se mover para essa nova posição
     if(!CanRobotMove( towerModel)){
+
         chr_pos = chr_pos_old; //Se não, volta para sua posiçao anterior
     }
 
@@ -950,13 +954,14 @@ bool CanRobotMove(glm::mat4 towerModel){
         if(CompareAABB_AABB(ROBOTTOP,modelCompareRobot,CUBE,cubeModel) || CompareAABB_AABB(ROBOTBOTTOM,modelCompareRobot,CUBE,cubeModel)){
             glm::vec4 cubeBboxmax = cubeModel*mapBboxMax[CUBE];
             platformCollision = true;
+            jump_activated= false;
 
             //Isso significa que o personagem está em cima da plataforma (testa as alturas y do robo e da plataforma com um pequeno intervalo (delta))
-            float delta = 0.01;
             if(  (chr_pos[1] <=  cubeBboxmax[1]+delta) &&  (chr_pos[1] >=  cubeBboxmax[1]-delta)){
                 on_top_of_y = chr_pos[1];//avisa a gravidade para nao empurrar o robo para baixo
                 on_top_of_platform = i; //indica que essa plataforma nao poderá ser movida
                 can_jump = true;            //avisa que o robo pode pular
+
                 platformCollision = false; //permite o robo a se mover (pois ele está em cima da plataforma)
 
             }
@@ -968,7 +973,9 @@ bool CanRobotMove(glm::mat4 towerModel){
     ///////////////////////////////////////////////////////////////////////////////////////
     //Testando se o robo irá ter intersecção com a torre
     bool towerCollision = (CompareAABB_AABB(ROBOTTOP,modelCompareRobot,TOWER,towerModel) || CompareAABB_AABB(ROBOTBOTTOM,modelCompareRobot,TOWER,towerModel));
-
+    if(towerCollision){
+        jump_activated= false;
+    }
     //Testando se o robo está em cima da torre
     glm::vec4 towerBboxmax= towerModel*mapBboxMax[TOWER];
     //Isso significa que o personagem está em cima da torre (testa as alturas y do robo e da plataforma com um pequeno intervalo(delta))
