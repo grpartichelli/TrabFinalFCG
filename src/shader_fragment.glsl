@@ -48,6 +48,13 @@ out vec3 color;
 #define M_PI   3.14159265358979323846
 #define M_PI_2 1.57079632679489661923
 
+//vec3 calculate_blinn_phong_term(vec3 ks, vec3 I, vec3 n, vec4 v, vec4 l, float q);
+/*vec3 calculate_blinn_phong_term(vec3 ks, vec3 I, vec3 n, vec4 v, vec4 l, float q) {
+    vec4 h = normalize(v + l);
+
+    return ks * I * pow(max(dot(n, l), 0), q);
+}*/
+
 void main()
 {
     // Obtemos a posição da câmera utilizando a inversa da matriz que define o
@@ -72,6 +79,12 @@ void main()
     // Vetor que define o sentido da câmera em relação ao ponto atual.
     vec4 v = normalize(camera_position - p);
 
+    // Blinn-Phong Illumination
+    vec3 I = vec3(1.0, 1.0, 1.0);
+    vec3 refletancia_difusa;
+    vec4 h;
+    float q;
+    vec3 blinn_phong_specular_term = vec3(0.0, 0.0, 0.0); //inicializando em 0 para poder calcular somente em alguns objetos
     //BBOX
     float minx = bbox_min.x;
     float maxx = bbox_max.x;
@@ -100,6 +113,12 @@ void main()
         case TROPHY:
             //Utilizando a texture de Ouro para o troféu
             Kd0 = texture(TextureOuro, vec2(U,V)).rgb;
+
+            refletancia_difusa = vec3(0.8,0.8,0.8);
+            h = normalize(v + l);
+            q = 32.0;
+            blinn_phong_specular_term = refletancia_difusa*I*pow(max(0,dot(n,h)), q);
+
             break;
 
         case FLOOR:
@@ -114,37 +133,70 @@ void main()
         // PROJEÇÃO PLANAR PARA A TORRE
         case TORRE:
             Kd0 = texture(TextureTijolo, vec2(U,V)).rgb; //Utilizando a textura de tijolo para a torre
+
+            refletancia_difusa = vec3(0.8,0.8,0.8);
+            h = normalize(v + l);
+            q = 32.0;
+            blinn_phong_specular_term = refletancia_difusa*I*pow(max(0,dot(n,h)), q);
+
             break;
 
         //PROJEÇÃO PLANAR PARA ROBO
         case ROBOTTOP:
             Kd0 = texture(TextureMetalClaro, vec2(U,V)).rgb; //Utilizando a textura de metal claro para o topo
+
+            refletancia_difusa = vec3(0.8,0.8,0.8);
+            h = normalize(v + l);
+            q = 32.0;
+            blinn_phong_specular_term = refletancia_difusa*I*pow(max(0,dot(n,h)), q);
+
             break;
         case ROBOTBOTTOM:
-             Kd0 = texture(TextureMetalEscuro, vec2(U,V)).rgb;  //Utilizando a textura de metal escuro para a parte de baixo
-             break;
+            Kd0 = texture(TextureMetalEscuro, vec2(U,V)).rgb;  //Utilizando a textura de metal escuro para a parte de baixo
+
+            refletancia_difusa = vec3(0.8,0.8,0.8);
+            h = normalize(v + l);
+            q = 32.0;
+            blinn_phong_specular_term = refletancia_difusa*I*pow(max(0,dot(n,h)), q);
+
+            break;
         //PROJEÇÃO ESFÉRICA PARA O CUBO
         case SPHERE:
+            Kd0 = texture(TextureTijolo, vec2(U,V)).rgb;
             U = (theta + M_PI)/(2*M_PI);
             V = (phi + M_PI_2)/M_PI;
-            Kd0 = texture(TextureTijolo, vec2(U,V)).rgb;
+
+            refletancia_difusa = vec3(0.8,0.8,0.8);
+            h = normalize(v + l);
+            q = 32.0;
+            blinn_phong_specular_term = refletancia_difusa*I*pow(max(0,dot(n,h)), q);
+
             break;
         ////PROJEÇÃO PLANAR PARA A ESFERA
         case CUBE:
+            refletancia_difusa = vec3(0.8,0.8,0.8);
+            h = normalize(v + l);
+            q = 32.0;
+            blinn_phong_specular_term = refletancia_difusa*I*pow(max(0,dot(n,h)), q);
             Kd0 = texture(TextureMeteoro, vec2(U,V)).rgb;
             break;
         }
-
 
     // Equação de Iluminação
     float lambert = max(0,dot(n,l));
 
 
-
-    color = Kd0   * (lambert + 0.5);
+    color = Kd0   * (lambert + 0.5) + blinn_phong_specular_term;
 
     // Cor final com correção gamma, considerando monitor sRGB.
     // Veja https://en.wikipedia.org/w/index.php?title=Gamma_correction&oldid=751281772#Windows.2C_Mac.2C_sRGB_and_TV.2Fvideo_standard_gammas
     color = pow(color, vec3(1.0,1.0,1.0)/2.2);
 }
+
+
+/*vec3 calculate_blinn_phong_term(vec3 ks, vec3 I, vec3 n, vec4 v, vec4 l, float q) {
+    vec4 h = normalize(v + l);
+
+    return ks * I * pow(max(dot(n, l), 0), q);
+}*/
 
