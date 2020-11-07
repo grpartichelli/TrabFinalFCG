@@ -67,6 +67,8 @@
 #define TOWER_SCALE 0.4f
 #define SPHERE_SCALE 0.4f
 
+#define SPHERE_RADIUS 2.54558420181f //raio da esfera no .obj
+
 
 // Estrutura que representa um modelo geométrico carregado a partir de um
 // arquivo ".obj". Veja https://en.wikipedia.org/wiki/Wavefront_.obj_file .
@@ -177,12 +179,6 @@ float g_ScreenRatio = 1.0f;
 bool g_LeftMouseButtonPressed = false;
 
 
-// Variável que controla o tipo de projeção utilizada: perspectiva ou ortográfica.
-bool g_UsePerspectiveProjection = true;
-
-// Variável que controla se o texto informativo será mostrado na tela.
-bool g_ShowInfoText = true;
-
 // Variáveis que definem um programa de GPU (shaders). Veja função LoadShadersFromFiles().
 GLuint vertex_shader_id;
 GLuint fragment_shader_id;
@@ -201,17 +197,33 @@ GLuint g_NumLoadedTextures = 0;
 //////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////
 //Nossas funções
-void BezierMeteorMove(float t); // Move o meteoro de acordo com o tempo e uma curva de bézier de grau 3
-bool CompareAABB_AABB(int bbox_id1, glm::mat4 model1, int bbox_id2,glm::mat4 model2); //Compara duas bbox, retorna true caso intersecçao
+void LoadLosingScreen(GLFWwindow* window); //Carrega tela de derrota (usuario foi atigido pelo meteoro)
+void LoadWinningScreen(GLFWwindow* window); //Carrega tela de vitoria (usuario encostou no troféu)
+
+void TowerTopCollisions();//Fazendo teste de colisão do ponto no topo da torre e o robo, se enconstar o jogador ganha
+void MeteorCollisions(); //Fazendo testes de colisão do meteoro com o robo e as plataformas
+
 bool CanPlatformMove(int platform_id,  glm::mat4 towerModel); //Calcula se a plataforma pode andar (compara com torre e com robo)
 bool CanRobotMove(glm::mat4 towerModel); //Calcula se a intersecção do robo com algo caso ele se mova
+
+void BezierMeteorMove(float t); // Move o meteoro de acordo com o tempo e uma curva de bézier de grau 3
+
+bool ComparePoint_AABB(glm::vec4 p, int bbox_id,glm::mat4 model);//Compara bbox com ponto, retorna true caso intersecção
+bool CompareSphere_AABB(float radius, glm::vec4 center, int bbox_id,glm::mat4 model);
+bool CompareAABB_AABB(int bbox_id1, glm::mat4 model1, int bbox_id2,glm::mat4 model2); //Compara duas bbox, retorna true caso intersecçao
+
 void LoadCharacterCamera(GLFWwindow* window); //Calcula os vetor view_vector e as posições do centro e lookat da camera do personagem
 void LoadLookAtCamera(glm::vec4 look_at_point); //Calcula os vetor view_vector e as posições do centro e lookat da camera lookat
 void LoadFreeCamera(GLFWwindow* window); //Calcula os vetor view_vector e as posições do centro e lookat da camera free
+
 void LoadTexturesAndModels(); //Carrega os modelos .obj e texturas que serão utilizadas
 void DrawObjectModels();    //Desenha o modelo dos objetos na cena
+
 glm::mat4 ComputeProjectionMatrix(); //Cria matriz de projeção
 
+//VARIAVEIS QUE CONTROLAM SE O JOGADOR GANHOU/PERDEU O JOGO
+bool lost_game = false;
+bool won_game = false;
 
 //DEFINIÇÕES DA CAMÊRA E POSIÇÃO DO PERSONAGEM
 //POSIÇÃO REAL DO PERSONAGEM
@@ -311,7 +323,7 @@ int main(int argc, char* argv[])
     GLFWwindow* window;
     window = glfwCreateWindow(window_w*0.8, window_h*0.8, "Mr Robot Reaches the Top", NULL, NULL);
 
-    glfwSetWindowPos(window, 400, 50);
+    glfwSetWindowPos(window, 250, 50);
 
 
 
@@ -381,59 +393,72 @@ int main(int argc, char* argv[])
     // Ficamos em loop, renderizando, até que o usuário feche a janela
     while (!glfwWindowShouldClose(window))
     {
+        if(lost_game){
+           LoadLosingScreen(window);
+        } else if(won_game){
+            LoadWinningScreen(window);
+        } else {
 
 
-        glClearColor(0.6f, 0.8f, 1.0f, 0.8f); //COR DE FUNDO AZUL
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); //PINTA O BUFFER COM A COR ACIMA
+            glClearColor(0.6f, 0.8f, 1.0f, 0.8f); //COR DE FUNDO AZUL
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); //PINTA O BUFFER COM A COR ACIMA
 
-        glUseProgram(program_id); //GPU UTILIZA OS SHADERS ACIMA
+            glUseProgram(program_id); //GPU UTILIZA OS SHADERS ACIMA
 
-        //Obtem a diferença de tempo atual
-        t_atual = glfwGetTime();
-        t_dif = t_atual - t_prev;
-        t_prev = t_atual;
+            //Obtem a diferença de tempo atual
+            t_atual = glfwGetTime();
+            t_dif = t_atual - t_prev;
+            t_prev = t_atual;
 
-        //Calculando o valor t para curva de bzier
-        bzier_t+= t_dif;
-        //resetando a cada CURVE_TIME
-        if(bzier_t >= CURVE_TIME){
-            bzier_t =0;
+            //Calculando o valor t para curva de bzier
+            bzier_t+= t_dif;
+            //resetando a cada CURVE_TIME
+            if(bzier_t >= CURVE_TIME){
+                bzier_t =0;
+            }
+
+            //Mover o meteoro numa curva de bézier
+            BezierMeteorMove(bzier_t/CURVE_TIME);
+
+            //TIPO DE CAMERA UTILIZADA
+            switch(camera_type){
+                case CHARACTER_CAMERA:
+                    LoadCharacterCamera(window);
+                    break;
+                case LOOK_AT_CAMERA:
+                    LoadLookAtCamera(chr_pos);
+                    break;
+                case FREE_CAMERA:
+                    LoadFreeCamera(window);
+                    break;
+            }
+
+            // Computamos a matriz "View" utilizando os parâmetros da câmera para definir o sistema de coordenadas da câmera.
+            glm::mat4 view = Matrix_Camera_View(camera_position_c, camera_view_vector, camera_up_vector);
+            //Calculando a matrix de projeção perspectiva
+            glm::mat4 projection = ComputeProjectionMatrix();
+            //Envia as matrizes para a gpu
+            glUniformMatrix4fv(view_uniform       , 1 , GL_FALSE , glm::value_ptr(view));
+            glUniformMatrix4fv(projection_uniform , 1 , GL_FALSE , glm::value_ptr(projection));
+
+            //Desenhando cada objeto na cena
+            DrawObjectModels();
+
+
+            //Testando colisões da esfera com jogador e plataformas e realizando a operação adequada
+            MeteorCollisions();
+
+            //Testando colisoes do jogador com um ponto no topo da torre, dando a vitoria caso ocorra
+            TowerTopCollisions();
+
+
+            ///////////////////////////////////////////
+            //Imprimindo informações na tela
+
+            TextRendering_ShowFramesPerSecond(window);
+            glfwSwapBuffers(window); //Troca de buffers permitindo a visualização dos objetos
+            glfwPollEvents(); //Verificando eventos de iteração do usuário
         }
-
-        //Mover o meteoro numa curva de bézier
-        BezierMeteorMove(bzier_t/CURVE_TIME);
-
-
-        //TIPO DE CAMERA UTILIZADA
-        switch(camera_type){
-            case CHARACTER_CAMERA:
-                LoadCharacterCamera(window);
-                break;
-            case LOOK_AT_CAMERA:
-                LoadLookAtCamera(chr_pos);
-                break;
-            case FREE_CAMERA:
-                LoadFreeCamera(window);
-                break;
-        }
-
-        // Computamos a matriz "View" utilizando os parâmetros da câmera para definir o sistema de coordenadas da câmera.
-        glm::mat4 view = Matrix_Camera_View(camera_position_c, camera_view_vector, camera_up_vector);
-        //Calculando a matrix de projeção(pode ser perspectiva ou ortográfica
-        glm::mat4 projection = ComputeProjectionMatrix();
-        //Envia as matrizes para a gpu
-        glUniformMatrix4fv(view_uniform       , 1 , GL_FALSE , glm::value_ptr(view));
-        glUniformMatrix4fv(projection_uniform , 1 , GL_FALSE , glm::value_ptr(projection));
-
-        //Desenhando cada objeto na cena
-        DrawObjectModels();
-        ///////////////////////////////////////////
-        //Imprimindo informações na tela
-
-        TextRendering_ShowProjection(window);
-        TextRendering_ShowFramesPerSecond(window);
-        glfwSwapBuffers(window); //Troca de buffers permitindo a visualização dos objetos
-        glfwPollEvents(); //Verificando eventos de iteração do usuário
     }
 
     // Finalizamos o uso dos recursos do sistema operacional
@@ -442,6 +467,95 @@ int main(int argc, char* argv[])
     // Fim do programa
     return 0;
 }
+
+//Tela de vitoria
+void LoadWinningScreen(GLFWwindow* window){
+    glClearColor(0, 1,0, 0.2f); //COR DE FUNDO VERMELHA
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); //PINTA O BUFFER COM A COR ACIMA
+
+
+    //Imprime na tela a mensagem de derrota
+    float charwidth = TextRendering_CharWidth(window);
+    TextRendering_PrintString(window, "VITORIA: O robo chegou no topo da torre.",0-charwidth*(20), 0, 1.0f);
+
+
+    glUseProgram(program_id); //diz quais shaders a gpu usa
+    glfwSwapBuffers(window); //Troca de buffers permitindo a visualização dos objetos
+    glfwPollEvents(); //Verificando eventos de iteração do usuário ( caso ele aperte ESC)
+}
+
+//Tela de Derrota
+void LoadLosingScreen(GLFWwindow* window){
+    glClearColor(1, 0,0, 0.2f); //COR DE FUNDO VERMELHA
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); //PINTA O BUFFER COM A COR ACIMA
+
+
+    //Imprime na tela a mensagem de derrota
+    float charwidth = TextRendering_CharWidth(window);
+    TextRendering_PrintString(window, "DERROTA: O robo foi atingido pelo meteoro.",0-charwidth*(21), 0, 1.0f);
+
+
+    glUseProgram(program_id); //diz quais shaders a gpu usa
+    glfwSwapBuffers(window); //Troca de buffers permitindo a visualização dos objetos
+    glfwPollEvents(); //Verificando eventos de iteração do usuário ( caso ele aperte ESC)
+}
+
+
+//Colisão com um ponto no topo da torre torna o usuário vitorioso
+void TowerTopCollisions(){
+    glm::mat4 modelCompareRobot = Matrix_Translate(chr_pos[0],chr_pos[1],chr_pos[2])*Matrix_Scale(ROBOT_SCALE,ROBOT_SCALE,ROBOT_SCALE); //Diminuindo o tamanho do robo
+
+    glm::vec4 towerMax = Matrix_Scale(TOWER_SCALE,TOWER_SCALE,TOWER_SCALE)*mapBboxMax[TOWER]; //conseguindo a bbox_max da torre
+    glm::vec4 p = glm::vec4(0,towerMax.y,0,1); //ponto no topo da torre
+
+
+    if(ComparePoint_AABB(p,ROBOTTOP,modelCompareRobot)  || ComparePoint_AABB(p,ROBOTBOTTOM,modelCompareRobot)){
+        won_game =true; //Se encostar no ponto, ganha o jogo
+    }
+}
+
+//Colisões do meteoro: Com jogador, ele perde o jogo
+//                     Com plataforma, gera uma plataforma nova na altura Y, a antiga some
+void MeteorCollisions(){
+
+    float radius = SPHERE_RADIUS*SPHERE_SCALE;
+
+    glm::mat4 modelCompareRobot = Matrix_Translate(chr_pos[0],chr_pos[1],chr_pos[2])*Matrix_Scale(ROBOT_SCALE,ROBOT_SCALE,ROBOT_SCALE); //Diminuindo o tamanho do robo
+
+    //testa se a esfera colidiu com o robo
+    if(CompareSphere_AABB(radius, sphere_pos,ROBOTTOP,modelCompareRobot) || CompareSphere_AABB(radius, sphere_pos,ROBOTBOTTOM,modelCompareRobot)){
+            lost_game = true;
+    }
+
+    float translate_x,translate_z;
+    //testa se a esfera colidiu com uma plataforma
+    for(int i=0; i<NUM_PLATFORMS; i++){
+        //calculando model dos cubos
+        glm::mat4 cubeModel =  Matrix_Translate(move_cubeX[i],0,move_cubeZ[i])*random_cube_models[i];
+
+        if(CompareSphere_AABB(radius, sphere_pos,CUBE,cubeModel)){
+            //GERA UMA PLATAFORMA NOVA
+            move_cubeZ[i] = 0; move_cubeX[i] = 0; move_cubeZOld[i] = 0; move_cubeXOld[i] = 0;
+
+            random_cube_models[i] = Matrix_Scale((rand()%100)/200+0.75,((rand()%100)/250)+0.2,(rand()%100)/200+0.75); //Achatamento aleatorio
+            translate_x = (rand()%10) - 5;
+            translate_z = (rand()%10) - 5;
+            //gerando plataformas que não estao dentro da torre ( entre -2 e 2)
+            while(translate_x <= 2 && translate_x >= -2){
+                translate_x = (rand()%10) - 5;
+            }
+             while(translate_z <= 2 && translate_z >= -2){
+                translate_z = (rand()%10) - 5;
+            }
+            random_cube_models[i] = Matrix_Translate(translate_x,i*0.5 + 1, translate_z)*random_cube_models[i]; //Deslocamento
+
+
+
+        }
+    }
+
+}
+
 //Movendo o meteoro numa curva de bézier de grau 3
 void BezierMeteorMove(float t){ //t é calculado com base no tempo e vai de 0 até 1
     float b03,b13,b23,b33;
@@ -463,8 +577,44 @@ void BezierMeteorMove(float t){ //t é calculado com base no tempo e vai de 0 at
 
     sphere_pos = p1*b03 + p2*b13 + p3*b23 + p4*b33;
 
+
 }
 
+//Compara ponto e AABB retornando true caso intersecção
+bool ComparePoint_AABB(glm::vec4 p, int bbox_id,glm::mat4 model){
+    //Obtendo as bboxes e multiplicando por seus modelos
+    glm::vec4 bbox_max = model*mapBboxMax[bbox_id];
+    glm::vec4 bbox_min = model*mapBboxMin[bbox_id];
+
+    // TESTE DE INTERSECÇÃO ENTRE AABB e PONTO (simplesmente testa se o ponto ta dentro dos intervalos da aabb
+    return (p.x >= bbox_min.x && p.x <= bbox_max.x) &&
+           (p.y >= bbox_min.y && p.y <= bbox_max.y) &&
+           (p.z >= bbox_min.z && p.z <= bbox_max.z);
+}
+
+//Compara uma esfera com uma bounding box, retorna true caso ocorra interecção
+bool CompareSphere_AABB(float radius, glm::vec4 sphere_center, int bbox_id,glm::mat4 model){
+    glm::vec4 bbox_max = model*mapBboxMax[bbox_id]; //Obtendo posição real da bounding box
+    glm::vec4 bbox_min = model*mapBboxMin[bbox_id]; //Obtendo posição real da bounding box
+
+
+    //Calculando o ponto mais próximo a esfera
+    //Tecnica de clamping
+    float closest_pointX = std::max(bbox_min.x, std::min(sphere_center.x, bbox_max.x));
+    float closest_pointY = std::max(bbox_min.y, std::min(sphere_center.y, bbox_max.y));
+    float closest_pointZ = std::max(bbox_min.z, std::min(sphere_center.z, bbox_max.z));
+
+
+    //Calculando a distancia entre esse ponto e o centro da esfera (cálculo de distancia euclediana)
+
+    float distance = sqrt( (closest_pointX - sphere_center.x) * (closest_pointX - sphere_center.x) +
+                           (closest_pointY - sphere_center.y) * (closest_pointY - sphere_center.y) +
+                           (closest_pointZ - sphere_center.z) * (closest_pointZ - sphere_center.z));
+
+    return distance <= radius; //Retorna sim se a distancia entre o ponto mais próximo a esfera da AABB
+                              //é menor que o raio, pois isso implica que ele deve estar dentro da esfera
+
+}
 //Compara duas bounding boxes, retorna true caso se intersecção
 bool CompareAABB_AABB(int bbox_id1, glm::mat4 model1, int bbox_id2,glm::mat4 model2){
     //Obtendo as bboxes e multiplicando por seus modelos
@@ -832,33 +982,18 @@ bool CanRobotMove(glm::mat4 towerModel){
 
     return !(towerCollision || platformCollision);
 }
+//Usando matriz perspectiva
 glm::mat4 ComputeProjectionMatrix(){
-    //COMPUTANDO MATRIZ DE PROJEÇÃO
-    // Agora computamos a matriz de Projeção.
 
-    // Note que, no sistema de coordenadas da câmera, os planos near e far
-    // estão no sentido negativo! Veja slides 176-204 do documento Aula_09_Projecoes.pdf.
     float nearplane = -0.1f;  // Posição do "near plane"
     float farplane  = -200.0f; // Posição do "far plane"
 
+    // Projeção Perspectiva.
+    float field_of_view = 3.141592 / 3.0f;
+    return Matrix_Perspective(field_of_view, g_ScreenRatio, nearplane, farplane);
 
 
-    //TIPO DE PROJEÇÃO
-    if (g_UsePerspectiveProjection)
-    {
-        // Projeção Perspectiva.
-        float field_of_view = 3.141592 / 3.0f;
-        return Matrix_Perspective(field_of_view, g_ScreenRatio, nearplane, farplane);
-    }
-    else
-    {
-        // Projeção Ortográfica.
-        float t = 1.5f*g_CameraDistance/2.5f;
-        float b = -t;
-        float r = t*g_ScreenRatio;
-        float l = -r;
-        return Matrix_Orthographic(l, r, b, t, nearplane, farplane);
-    }
+
 
 }
 
@@ -1513,27 +1648,9 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
     }
 
 
-    ////////////////////////////////////////////////////////////////////
-    // PROJEÇÕES
-    // Se o usuário apertar a tecla P, utilizamos projeção perspectiva.
-    if (key == GLFW_KEY_P && action == GLFW_PRESS)
-    {
-        g_UsePerspectiveProjection = true;
-    }
-
-    // Se o usuário apertar a tecla O, utilizamos projeção ortográfica.
-    if (key == GLFW_KEY_O && action == GLFW_PRESS)
-    {
-        g_UsePerspectiveProjection = false;
-    }
 
     ///////////////////////////////////////////////////////
     // CONTROLE DA TELA
-    // Se o usuário apertar a tecla H, fazemos um "toggle" do texto informativo mostrado na tela.
-    if (key == GLFW_KEY_H && action == GLFW_PRESS)
-    {
-        g_ShowInfoText = !g_ShowInfoText;
-    }
 
     if (key == GLFW_KEY_F && action == GLFW_PRESS){
         //Trocando entre mouse preso e mouse livre
@@ -1585,91 +1702,12 @@ void ErrorCallback(int error, const char* description)
     fprintf(stderr, "ERROR: GLFW: %s\n", description);
 }
 
-// Esta função recebe um vértice com coordenadas de modelo p_model e passa o
-// mesmo por todos os sistemas de coordenadas armazenados nas matrizes model,
-// view, e projection; e escreve na tela as matrizes e pontos resultantes
-// dessas transformações.
-void TextRendering_ShowModelViewProjection(
-    GLFWwindow* window,
-    glm::mat4 projection,
-    glm::mat4 view,
-    glm::mat4 model,
-    glm::vec4 p_model
-)
-{
-    if ( !g_ShowInfoText )
-        return;
-
-    glm::vec4 p_world = model*p_model;
-    glm::vec4 p_camera = view*p_world;
-    glm::vec4 p_clip = projection*p_camera;
-    glm::vec4 p_ndc = p_clip / p_clip.w;
-
-    float pad = TextRendering_LineHeight(window);
-
-    TextRendering_PrintString(window, " Model matrix             Model     In World Coords.", -1.0f, 1.0f-pad, 1.0f);
-    TextRendering_PrintMatrixVectorProduct(window, model, p_model, -1.0f, 1.0f-2*pad, 1.0f);
-
-    TextRendering_PrintString(window, "                                        |  ", -1.0f, 1.0f-6*pad, 1.0f);
-    TextRendering_PrintString(window, "                            .-----------'  ", -1.0f, 1.0f-7*pad, 1.0f);
-    TextRendering_PrintString(window, "                            V              ", -1.0f, 1.0f-8*pad, 1.0f);
-
-    TextRendering_PrintString(window, " View matrix              World     In Camera Coords.", -1.0f, 1.0f-9*pad, 1.0f);
-    TextRendering_PrintMatrixVectorProduct(window, view, p_world, -1.0f, 1.0f-10*pad, 1.0f);
-
-    TextRendering_PrintString(window, "                                        |  ", -1.0f, 1.0f-14*pad, 1.0f);
-    TextRendering_PrintString(window, "                            .-----------'  ", -1.0f, 1.0f-15*pad, 1.0f);
-    TextRendering_PrintString(window, "                            V              ", -1.0f, 1.0f-16*pad, 1.0f);
-
-    TextRendering_PrintString(window, " Projection matrix        Camera                    In NDC", -1.0f, 1.0f-17*pad, 1.0f);
-    TextRendering_PrintMatrixVectorProductDivW(window, projection, p_camera, -1.0f, 1.0f-18*pad, 1.0f);
-
-    int width, height;
-    glfwGetFramebufferSize(window, &width, &height);
-
-    glm::vec2 a = glm::vec2(-1, -1);
-    glm::vec2 b = glm::vec2(+1, +1);
-    glm::vec2 p = glm::vec2( 0,  0);
-    glm::vec2 q = glm::vec2(width, height);
-
-    glm::mat4 viewport_mapping = Matrix(
-        (q.x - p.x)/(b.x-a.x), 0.0f, 0.0f, (b.x*p.x - a.x*q.x)/(b.x-a.x),
-        0.0f, (q.y - p.y)/(b.y-a.y), 0.0f, (b.y*p.y - a.y*q.y)/(b.y-a.y),
-        0.0f , 0.0f , 1.0f , 0.0f ,
-        0.0f , 0.0f , 0.0f , 1.0f
-    );
-
-    TextRendering_PrintString(window, "                                                       |  ", -1.0f, 1.0f-22*pad, 1.0f);
-    TextRendering_PrintString(window, "                            .--------------------------'  ", -1.0f, 1.0f-23*pad, 1.0f);
-    TextRendering_PrintString(window, "                            V                           ", -1.0f, 1.0f-24*pad, 1.0f);
-
-    TextRendering_PrintString(window, " Viewport matrix           NDC      In Pixel Coords.", -1.0f, 1.0f-25*pad, 1.0f);
-    TextRendering_PrintMatrixVectorProductMoreDigits(window, viewport_mapping, p_ndc, -1.0f, 1.0f-26*pad, 1.0f);
-}
-
-
-
-// Escrevemos na tela qual matriz de projeção está sendo utilizada.
-void TextRendering_ShowProjection(GLFWwindow* window)
-{
-    if ( !g_ShowInfoText )
-        return;
-
-    float lineheight = TextRendering_LineHeight(window);
-    float charwidth = TextRendering_CharWidth(window);
-
-    if ( g_UsePerspectiveProjection )
-        TextRendering_PrintString(window, "Perspective", 1.0f-13*charwidth, -1.0f+2*lineheight/10, 1.0f);
-    else
-        TextRendering_PrintString(window, "Orthographic", 1.0f-13*charwidth, -1.0f+2*lineheight/10, 1.0f);
-}
 
 // Escrevemos na tela o número de quadros renderizados por segundo (frames per
 // second).
 void TextRendering_ShowFramesPerSecond(GLFWwindow* window)
 {
-    if ( !g_ShowInfoText )
-        return;
+
 
     // Variáveis estáticas (static) mantém seus valores entre chamadas
     // subsequentes da função!
