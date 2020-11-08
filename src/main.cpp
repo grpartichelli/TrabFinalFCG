@@ -394,6 +394,7 @@ int main(int argc, char* argv[])
     // Ficamos em loop, renderizando, até que o usuário feche a janela
     while (!glfwWindowShouldClose(window))
     {
+
         if(lost_game){
            LoadLosingScreen(window);
         } else if(won_game){
@@ -550,6 +551,12 @@ void MeteorCollisions(){
             }
             random_cube_models[i] = Matrix_Translate(translate_x,i*0.5 + 1, translate_z)*random_cube_models[i]; //Deslocamento
 
+            //Garante que nao seja gerada em cima do robo
+            glm::mat4 modelCompareRobot = Matrix_Translate(chr_pos[0],chr_pos[1],chr_pos[2])*Matrix_Scale(ROBOT_SCALE,ROBOT_SCALE,ROBOT_SCALE); //Diminuindo o tamanho do robo
+            cubeModel =  Matrix_Translate(move_cubeX[i],0,move_cubeZ[i])*random_cube_models[i];
+            if(CompareAABB_AABB(ROBOTTOP,modelCompareRobot,CUBE,cubeModel) || CompareAABB_AABB(ROBOTBOTTOM,modelCompareRobot,CUBE,cubeModel)){
+                i--;
+            }
 
 
         }
@@ -906,6 +913,8 @@ void DrawObjectModels(){
         glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(object_id_uniform, CUBE);
         DrawVirtualObject("cube",CUBE);
+        move_cubeXOld[i] = move_cubeX[i];
+        move_cubeZOld[i] = move_cubeZ[i];
     }
 
 
@@ -918,6 +927,7 @@ void DrawObjectModels(){
     DrawVirtualObject("sphere",-1 ); //bbox id da sphere é zero pois utilizamos comparação com esfera
 
 
+    chr_pos_old = chr_pos;
 
 
     initialize = false;
@@ -939,7 +949,7 @@ bool CanPlatformMove(int platform_id,  glm::mat4 towerModel){
 bool CanRobotMove(glm::mat4 towerModel){
     on_top_of_y = 0; //sempre assumimindo que ele está no chão se ele não entrar em contato com nenhuma plataforma
     on_top_of_platform=-1;//sempre assumindo que não estamos em cima de nenhuma plataforma
-    float delta = 0.01;
+    float delta = 10*t_dif;
     //Nao utilizando a rotação da cabeça do robo nas comparações
     glm::mat4 modelCompareRobot = Matrix_Translate(chr_pos[0],chr_pos[1],chr_pos[2])*Matrix_Scale(ROBOT_SCALE,ROBOT_SCALE,ROBOT_SCALE); //Diminuindo o tamanho do robo
 
