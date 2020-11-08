@@ -454,12 +454,14 @@ int main(int argc, char* argv[])
             TowerTopCollisions();
 
 
+
             ///////////////////////////////////////////
             //Imprimindo informações na tela
 
             TextRendering_ShowFramesPerSecond(window);
             glfwSwapBuffers(window); //Troca de buffers permitindo a visualização dos objetos
             glfwPollEvents(); //Verificando eventos de iteração do usuário
+
         }
     }
 
@@ -949,7 +951,7 @@ bool CanPlatformMove(int platform_id,  glm::mat4 towerModel){
 bool CanRobotMove(glm::mat4 towerModel){
     on_top_of_y = 0; //sempre assumimindo que ele está no chão se ele não entrar em contato com nenhuma plataforma
     on_top_of_platform=-1;//sempre assumindo que não estamos em cima de nenhuma plataforma
-    float delta = 25*t_dif;
+    float delta = 30*t_dif;
     //Nao utilizando a rotação da cabeça do robo nas comparações
     glm::mat4 modelCompareRobot = Matrix_Translate(chr_pos[0],chr_pos[1],chr_pos[2])*Matrix_Scale(ROBOT_SCALE,ROBOT_SCALE,ROBOT_SCALE); //Diminuindo o tamanho do robo
 
@@ -1640,14 +1642,14 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
 
     ////////////////////////////////////////////////////////////////////
     //MOVIMENTAÇÃO DAS PLATAFORMAS EIXO X E Z
-    float cube_speed = 50;
+    float cube_speed = 0.1;
     if (glfwGetKey(window,GLFW_KEY_Q) == GLFW_PRESS)
     {
          for(int i =0; i<NUM_PLATFORMS; i++){
             move_cubeXOld[i] = move_cubeX[i]; //Salva a posição caso o cubo nao possa se mover
 
             if(i != on_top_of_platform){ //Se o personagem está em cima do cubo, ele não se mexe
-                move_cubeX[i] += (mod & GLFW_MOD_SHIFT) ? -cube_speed*t_dif : cube_speed*t_dif;
+                move_cubeX[i] += (mod & GLFW_MOD_SHIFT) ? -cube_speed : cube_speed;
 
             }
          }
@@ -1659,7 +1661,7 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
             move_cubeZOld[i] = move_cubeZ[i]; //Salva a posição caso o cubo nao possa se mover
 
             if(i != on_top_of_platform){ //Se o personagem está em cima do cubo, ele não se mexe
-                move_cubeZ[i] += (mod & GLFW_MOD_SHIFT) ? -cube_speed*t_dif : cube_speed*t_dif;
+                move_cubeZ[i] += (mod & GLFW_MOD_SHIFT) ? -cube_speed : cube_speed;
             }
          }
     }
@@ -1700,13 +1702,14 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
     if (key == GLFW_KEY_2 && action == GLFW_PRESS)
     {
         camera_type = LOOK_AT_CAMERA;
-
+        chr_pos[1] = on_top_of_y;
         g_CameraPhi =  0.0825f;
 
     }
     if (key == GLFW_KEY_3 && action == GLFW_PRESS)
     {
         camera_type = FREE_CAMERA;
+        chr_pos[1] = on_top_of_y;
 
     }
 
