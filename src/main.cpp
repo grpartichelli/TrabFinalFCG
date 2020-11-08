@@ -949,7 +949,7 @@ bool CanPlatformMove(int platform_id,  glm::mat4 towerModel){
 bool CanRobotMove(glm::mat4 towerModel){
     on_top_of_y = 0; //sempre assumimindo que ele está no chão se ele não entrar em contato com nenhuma plataforma
     on_top_of_platform=-1;//sempre assumindo que não estamos em cima de nenhuma plataforma
-    float delta = 10*t_dif;
+    float delta = 25*t_dif;
     //Nao utilizando a rotação da cabeça do robo nas comparações
     glm::mat4 modelCompareRobot = Matrix_Translate(chr_pos[0],chr_pos[1],chr_pos[2])*Matrix_Scale(ROBOT_SCALE,ROBOT_SCALE,ROBOT_SCALE); //Diminuindo o tamanho do robo
 
