@@ -162,9 +162,9 @@ void main()
             break;
         //PROJEÇÃO ESFÉRICA PARA O CUBO
         case SPHERE:
-            Kd0 = texture(TextureTijolo, vec2(U,V)).rgb;
             U = (theta + M_PI)/(2*M_PI);
             V = (phi + M_PI_2)/M_PI;
+            Kd0 = texture(TextureTijolo, vec2(U,V)).rgb;
 
             refletancia_difusa = vec3(0.8,0.8,0.8);
             h = normalize(v + l);
