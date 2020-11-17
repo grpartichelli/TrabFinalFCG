@@ -6,6 +6,7 @@
 // "shader_vertex.glsl" e "main.cpp".
 in vec4 position_world;
 in vec4 normal;
+in vec3 cor_vertex;
 
 // Posição do vértice atual no sistema de coordenadas local do modelo.
 in vec4 position_model;
@@ -24,8 +25,8 @@ uniform mat4 projection;
 #define TORRE 2
 #define ROBOTTOP 3
 #define ROBOTBOTTOM 4
-#define CUBE 5
-#define SPHERE 6
+#define METEOR 5
+#define PLATFORM 6
 uniform int object_id;
 
 // Parâmetros da axis-aligned bounding box (AABB) do modelo
@@ -129,15 +130,14 @@ void main()
             V = V - floor(V);
             //Utilizando a textura de grama para o chão
             Kd0 = texture(TextureGrama, vec2(U,V)).rgb;
+            refletancia_difusa = vec3(0.5,1.0,0.5); // luz esverdeada
+            h = normalize(v + l);
+            q = 50.0;
+            blinn_phong_specular_term = refletancia_difusa*I*pow(max(0,dot(n,h)), q);
             break;
         // PROJEÇÃO PLANAR PARA A TORRE
         case TORRE:
             Kd0 = texture(TextureTijolo, vec2(U,V)).rgb; //Utilizando a textura de tijolo para a torre
-
-            refletancia_difusa = vec3(0.8,0.8,0.8);
-            h = normalize(v + l);
-            q = 32.0;
-            blinn_phong_specular_term = refletancia_difusa*I*pow(max(0,dot(n,h)), q);
 
             break;
 
@@ -145,9 +145,9 @@ void main()
         case ROBOTTOP:
             Kd0 = texture(TextureMetalClaro, vec2(U,V)).rgb; //Utilizando a textura de metal claro para o topo
 
-            refletancia_difusa = vec3(0.8,0.8,0.8);
+            refletancia_difusa = vec3(0.8,0.8,0.5);
             h = normalize(v + l);
-            q = 32.0;
+            q = 10.0;
             blinn_phong_specular_term = refletancia_difusa*I*pow(max(0,dot(n,h)), q);
 
             break;
@@ -160,23 +160,23 @@ void main()
             blinn_phong_specular_term = refletancia_difusa*I*pow(max(0,dot(n,h)), q);
 
             break;
-        //PROJEÇÃO ESFÉRICA PARA O CUBO
-        case SPHERE:
+        //PROJEÇÃO ESFÉRICA PARA A PLATAFORMA
+        case PLATFORM:
             U = (theta + M_PI)/(2*M_PI);
             V = (phi + M_PI_2)/M_PI;
             Kd0 = texture(TextureTijolo, vec2(U,V)).rgb;
 
-            refletancia_difusa = vec3(0.8,0.8,0.8);
+            refletancia_difusa = vec3(0.8,0.8,0.6); //levemente amarelada
             h = normalize(v + l);
             q = 32.0;
             blinn_phong_specular_term = refletancia_difusa*I*pow(max(0,dot(n,h)), q);
 
             break;
-        ////PROJEÇÃO PLANAR PARA A ESFERA
-        case CUBE:
-            refletancia_difusa = vec3(0.8,0.8,0.8);
+        ////PROJEÇÃO PLANAR PARA O METEORO
+        case METEOR:
+            refletancia_difusa = vec3(0.0,0.0,0.0); // luz branca
             h = normalize(v + l);
-            q = 32.0;
+            q = 100.0; // deixar pouco brilhante
             blinn_phong_specular_term = refletancia_difusa*I*pow(max(0,dot(n,h)), q);
             Kd0 = texture(TextureMeteoro, vec2(U,V)).rgb;
             break;
@@ -186,11 +186,18 @@ void main()
     float lambert = max(0,dot(n,l));
 
 
-    color = Kd0   * (lambert + 0.5) + blinn_phong_specular_term;
+    color = Kd0  * (lambert + 0.5) + blinn_phong_specular_term;
 
     // Cor final com correção gamma, considerando monitor sRGB.
     // Veja https://en.wikipedia.org/w/index.php?title=Gamma_correction&oldid=751281772#Windows.2C_Mac.2C_sRGB_and_TV.2Fvideo_standard_gammas
-    color = pow(color, vec3(1.0,1.0,1.0)/2.2);
+
+
+    if(object_id == TROPHY || object_id == METEOR || object_id == ROBOTTOP) {
+        color = pow(cor_vertex, vec3(1.0,1.0,1.0)/2.2);
+
+    } else {
+        color = pow(color, vec3(1.0,1.0,1.0)/2.2);
+    }
 }
 
 
