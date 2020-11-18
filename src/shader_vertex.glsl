@@ -26,8 +26,8 @@ out vec2 texcoords;
 #define TORRE 2
 #define ROBOTTOP 3
 #define ROBOTBOTTOM 4
-#define CUBE 5
-#define SPHERE 6
+#define METEOR 5
+#define PLATFORM 6
 uniform int object_id;
 
 // Parâmetros da axis-aligned bounding box (AABB) do modelo
@@ -146,27 +146,6 @@ void main()
             blinn_phong_specular_term = refletancia_difusa*I*pow(max(0,dot(n,h)), q);
 
             break;
-
-        case FLOOR:
-            //PROJEÇÃO DO CHÃO UTILIZANDO UM ESTILO REPEAT
-            U = position_model[0];
-            U = U -floor(U);
-            V = position_model[2];
-            V = V - floor(V);
-            //Utilizando a textura de grama para o chão
-            Kd0 = texture(TextureGrama, vec2(U,V)).rgb;
-            refletancia_difusa = vec3(0.5,1.0,0.5); // luz esverdeada
-            h = normalize(v + l);
-            q = 50.0;
-            blinn_phong_specular_term = refletancia_difusa*I*pow(max(0,dot(n,h)), q);
-            break;
-        // PROJEÇÃO PLANAR PARA A TORRE
-        case TORRE:
-            Kd0 = texture(TextureTijolo, vec2(U,V)).rgb; //Utilizando a textura de tijolo para a torre
-
-            break;
-
-        //PROJEÇÃO PLANAR PARA ROBO
         case ROBOTTOP:
             Kd0 = texture(TextureMetalClaro, vec2(U,V)).rgb; //Utilizando a textura de metal claro para o topo
 
@@ -176,29 +155,7 @@ void main()
             blinn_phong_specular_term = refletancia_difusa*I*pow(max(0,dot(n,h)), q);
 
             break;
-        case ROBOTBOTTOM:
-            Kd0 = texture(TextureMetalEscuro, vec2(U,V)).rgb;  //Utilizando a textura de metal escuro para a parte de baixo
-
-            refletancia_difusa = vec3(0.8,0.8,0.8);
-            h = normalize(v + l);
-            q = 32.0;
-            blinn_phong_specular_term = refletancia_difusa*I*pow(max(0,dot(n,h)), q);
-
-            break;
-        //PROJEÇÃO ESFÉRICA PARA A ESFERA
-        case SPHERE:
-            U = (theta + M_PI)/(2*M_PI);
-            V = (phi + M_PI_2)/M_PI;
-            Kd0 = texture(TextureTijolo, vec2(U,V)).rgb;
-
-            refletancia_difusa = vec3(0.8,0.8,0.7);
-            h = normalize(v + l);
-            q = 32.0;
-            blinn_phong_specular_term = refletancia_difusa*I*pow(max(0,dot(n,h)), q);
-
-            break;
-        ////PROJEÇÃO PLANAR PARA O CUBO
-        case CUBE:
+        case METEOR:
             refletancia_difusa = vec3(0.0,0.0,0.0); // luz branca
             h = normalize(v + l);
             q = 100.0; // deixar pouco brilhante
@@ -208,9 +165,11 @@ void main()
         }
 
     // Equação de Iluminação
-    float lambert = max(0,dot(n,l));
-
-
-    cor_vertex = Kd0   * (lambert + 0.5) + blinn_phong_specular_term;
+    if(object_id == TROPHY || object_id == METEOR || object_id == ROBOTTOP) { // os 3 que vao ter gouraud
+        float lambert = max(0,dot(n,l));
+        cor_vertex = Kd0   * (lambert + 0.5) + blinn_phong_specular_term; // nem calcula para os que nao sao usados
+    } else {
+        cor_vertex = vec3(0.0, 0.0, 0.0);
+    }
 }
 

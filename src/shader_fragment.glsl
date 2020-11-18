@@ -49,13 +49,6 @@ out vec3 color;
 #define M_PI   3.14159265358979323846
 #define M_PI_2 1.57079632679489661923
 
-//vec3 calculate_blinn_phong_term(vec3 ks, vec3 I, vec3 n, vec4 v, vec4 l, float q);
-/*vec3 calculate_blinn_phong_term(vec3 ks, vec3 I, vec3 n, vec4 v, vec4 l, float q) {
-    vec4 h = normalize(v + l);
-
-    return ks * I * pow(max(dot(n, l), 0), q);
-}*/
-
 void main()
 {
     // Obtemos a posição da câmera utilizando a inversa da matriz que define o
@@ -85,7 +78,7 @@ void main()
     vec3 refletancia_difusa;
     vec4 h;
     float q;
-    vec3 blinn_phong_specular_term = vec3(0.0, 0.0, 0.0); //inicializando em 0 para poder calcular somente em alguns objetos
+    vec3 blinn_phong_specular_term;// = vec3(0.0, 0.0, 0.0); //inicializando em 0 para poder calcular somente em alguns objetos
     //BBOX
     float minx = bbox_min.x;
     float maxx = bbox_max.x;
@@ -110,18 +103,6 @@ void main()
     vec3 Kd0;
     switch(object_id)
     {
-        // PROJEÇÃO PLANAR PARA O TROFÉU
-        case TROPHY:
-            //Utilizando a texture de Ouro para o troféu
-            Kd0 = texture(TextureOuro, vec2(U,V)).rgb;
-
-            refletancia_difusa = vec3(0.8,0.8,0.8);
-            h = normalize(v + l);
-            q = 32.0;
-            blinn_phong_specular_term = refletancia_difusa*I*pow(max(0,dot(n,h)), q);
-
-            break;
-
         case FLOOR:
             //PROJEÇÃO DO CHÃO UTILIZANDO UM ESTILO REPEAT
             U = position_model[0];
@@ -138,17 +119,6 @@ void main()
         // PROJEÇÃO PLANAR PARA A TORRE
         case TORRE:
             Kd0 = texture(TextureTijolo, vec2(U,V)).rgb; //Utilizando a textura de tijolo para a torre
-
-            break;
-
-        //PROJEÇÃO PLANAR PARA ROBO
-        case ROBOTTOP:
-            Kd0 = texture(TextureMetalClaro, vec2(U,V)).rgb; //Utilizando a textura de metal claro para o topo
-
-            refletancia_difusa = vec3(0.8,0.8,0.5);
-            h = normalize(v + l);
-            q = 10.0;
-            blinn_phong_specular_term = refletancia_difusa*I*pow(max(0,dot(n,h)), q);
 
             break;
         case ROBOTBOTTOM:
@@ -172,38 +142,21 @@ void main()
             blinn_phong_specular_term = refletancia_difusa*I*pow(max(0,dot(n,h)), q);
 
             break;
-        ////PROJEÇÃO PLANAR PARA O METEORO
-        case METEOR:
-            refletancia_difusa = vec3(0.0,0.0,0.0); // luz branca
-            h = normalize(v + l);
-            q = 100.0; // deixar pouco brilhante
-            blinn_phong_specular_term = refletancia_difusa*I*pow(max(0,dot(n,h)), q);
-            Kd0 = texture(TextureMeteoro, vec2(U,V)).rgb;
-            break;
         }
 
     // Equação de Iluminação
     float lambert = max(0,dot(n,l));
 
 
-    color = Kd0  * (lambert + 0.5) + blinn_phong_specular_term;
-
     // Cor final com correção gamma, considerando monitor sRGB.
     // Veja https://en.wikipedia.org/w/index.php?title=Gamma_correction&oldid=751281772#Windows.2C_Mac.2C_sRGB_and_TV.2Fvideo_standard_gammas
-
-
-    if(object_id == TROPHY || object_id == METEOR || object_id == ROBOTTOP) {
+    if(object_id == TROPHY || object_id == METEOR || object_id == ROBOTTOP) { // esses 3 usam gouraud
         color = pow(cor_vertex, vec3(1.0,1.0,1.0)/2.2);
-
     } else {
-        color = pow(color, vec3(1.0,1.0,1.0)/2.2);
+        color = Kd0  * (lambert + 0.5);
+        if (object_id == FLOOR || object_id == ROBOTBOTTOM || object_id == PLATFORM) {
+            color += blinn_phong_specular_term; // esses 3 usam blinn-phong
+        }
+        color = pow(color, vec3(1.0,1.0,1.0)/2.2); // sobrou a torre que fica soh com lambert
     }
 }
-
-
-/*vec3 calculate_blinn_phong_term(vec3 ks, vec3 I, vec3 n, vec4 v, vec4 l, float q) {
-    vec4 h = normalize(v + l);
-
-    return ks * I * pow(max(dot(n, l), 0), q);
-}*/
-
