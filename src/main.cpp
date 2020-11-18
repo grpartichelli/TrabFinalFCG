@@ -579,7 +579,7 @@ void BezierMeteorMove(float t){ //t é calculado com base no tempo e vai de 0 at
     p4 = glm::vec4(-curve_radius/2,0,0,1.0f);
 
 
-    //Usando bézier polinomials para calcular nossa curva (slide 81 da aula 16)
+    //Usando bernstein polinomials para calcular nossa curva (slide 81 da aula 16)
     b03 = (1-t)*(1-t)*(1-t);
     b13 = 3*t*(1-t)*(1-t);
     b23 = 3*t*t*(1-t);
